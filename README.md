@@ -20,7 +20,7 @@ Videoconferências no navegador com identidade própria, Cloudflare Pages no fro
 
 O Worker requer as bindings `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET`. As duas credenciais devem permanecer como secrets. Para aceitar origens adicionais, configure `ALLOWED_ORIGINS` como uma lista separada por vírgulas.
 
-O frontend usa `https://kpnc-meet-api.workers.dev` por padrão. Caso a conta use outro subdomínio `workers.dev`, defina `window.KPNC_API_URL` antes de `/js/app.js` no `public/index.html`.
+O frontend usa `https://kpnc-meet-api.erikchristian2.workers.dev`. Para trocar o domínio da API no futuro, defina `window.KPNC_API_URL` antes de `/js/app.js` no `public/index.html`.
 
 ## Validação e deploy
 
@@ -33,3 +33,4 @@ pnpm run worker:deploy
 O deploy usa `--keep-vars`, preservando as variáveis e secrets já configurados no painel.
 
 Esta é uma implementação independente, sem marca, textos ou assets proprietários de serviços de referência.
+

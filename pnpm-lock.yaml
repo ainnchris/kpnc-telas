@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      livekit-server-sdk:
-        specifier: ^2.18.0
-        version: 2.18.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20260827.1
@@ -936,3 +932,4 @@ snapshots:
       '@speed-highlight/core': 1.2.24
       cookie: 1.1.1
       youch-core: 0.3.3
+

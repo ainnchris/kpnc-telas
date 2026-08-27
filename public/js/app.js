@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const LK = window.LivekitClient;
-  const API = window.KPNC_API_URL || 'https://kpnc-meet-api.workers.dev';
+  const API = window.KPNC_API_URL || 'https://kpnc-meet-api.erikchristian2.workers.dev';
   const $ = (selector) => document.querySelector(selector);
   const state = { mode: 'join', roomCode: '', preview: null, micOn: true, cameraOn: true, room: null, panel: 'people' };
   const el = { home: $('#home'), preview: $('#preview'), meeting: $('#meeting'), code: $('#room-code'), join: $('#join-meeting'), name: $('#display-name'), video: $('#preview-video'), avatar: $('#preview-avatar'), grid: $('#grid'), panel: $('#panel'), people: $('#people-list'), messages: $('#messages') };
@@ -87,3 +87,4 @@
   const queryRoom = normalizeCode(new URLSearchParams(location.search).get('room') || ''); if (queryRoom) { el.code.value = queryRoom; el.join.disabled = false; }
   window.addEventListener('beforeunload', () => { stopPreview(); state.room?.disconnect(); });
 })();
+

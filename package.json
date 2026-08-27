@@ -10,10 +10,10 @@
     "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc --keep-vars",
     "worker:types": "wrangler types --config worker/wrangler.jsonc worker/worker-configuration.d.ts"
   },
-  "dependencies": { "livekit-server-sdk": "^2.18.0" },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260827.1",
     "typescript": "^5.9.2",
     "wrangler": "^4.127.0"
   }
 }
+

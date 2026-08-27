@@ -1,5 +1,3 @@
-import { AccessToken } from 'livekit-server-sdk';
-
 type Env = { LIVEKIT_URL: string; LIVEKIT_API_KEY: string; LIVEKIT_API_SECRET: string; ALLOWED_ORIGINS?: string };
 const encoder = new TextEncoder();
 const MAX_BODY_BYTES = 4096;
@@ -30,10 +28,25 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
   if (encoder.encode(body).byteLength > MAX_BODY_BYTES) throw new Error('BODY_TOO_LARGE');
   return JSON.parse(body) as Record<string, unknown>;
 }
+function base64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+function encodePart(value: unknown): string { return base64Url(encoder.encode(JSON.stringify(value))) }
 async function issueToken(env: Env, room: string, name: string, host: boolean): Promise<string> {
-  const accessToken = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, { identity: `${host ? 'host' : 'guest'}-${crypto.randomUUID()}`, name, ttl: '6h', metadata: JSON.stringify({ host }) });
-  accessToken.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: host });
-  return accessToken.toJwt();
+  const now = Math.floor(Date.now() / 1000);
+  const identity = `${host ? 'host' : 'guest'}-${crypto.randomUUID()}`;
+  const header = encodePart({ alg: 'HS256', typ: 'JWT' });
+  const payload = encodePart({
+    exp: now + (6 * 60 * 60), iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name,
+    metadata: JSON.stringify({ host }),
+    video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: host }
+  });
+  const unsigned = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey('raw', encoder.encode(env.LIVEKIT_API_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(unsigned));
+  return `${unsigned}.${base64Url(new Uint8Array(signature))}`;
 }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -56,3 +69,4 @@ export default {
     }
   }
 } satisfies ExportedHandler<Env>;
+

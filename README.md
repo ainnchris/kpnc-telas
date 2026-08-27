@@ -1,67 +1,35 @@
 # Kpnc Telas
 
-Aplicação independente de compartilhamento de tela em tempo real usando WebRTC.
-
-Desenvolvido por **Jp Dev's**.
+Videoconferências no navegador com identidade própria, Cloudflare Pages no frontend, Cloudflare Workers na API e LiveKit Cloud como SFU.
 
 ## Recursos
 
-- Novo design em azul, branco e preto, com tema claro e escuro
-- Criar e entrar em salas por código/link
-- Senha opcional da sala
-- Compartilhamento de tela
-- Áudio de sistema quando o navegador/OS oferecer suporte
-- Visualização da sua própria transmissão em tempo real (auto-preview)
-- Configurações de áudio e vídeo: escolha de microfone (entrada) e de saída de som, mute/desmute
-- Chat em tempo real entre todos os participantes da sala
-- Múltiplos participantes
-- Múltiplas transmissões simultâneas
-- Lista de participantes
-- Dono da sala, expulsar participante, transferir propriedade
-- Alterar/remover senha
-- Convite por link
-- Interface responsiva
+- criação e entrada por código/link;
+- pré-entrada com câmera e microfone;
+- áudio, vídeo, apresentação de tela com áudio e reconexão automática;
+- grade responsiva, participantes, convite e chat em tempo real;
+- tokens LiveKit emitidos somente no Worker; as credenciais nunca chegam ao navegador.
 
-## Rodar localmente
+## Estrutura
 
-Requer Node.js 18+.
+- `public/`: site estático publicado pelo projeto Pages `kpnc-meet` (output `public`);
+- `worker/`: API publicada no Worker `kpnc-meet-api`;
+- `worker/src/index.ts`: criação de códigos criptograficamente aleatórios e emissão de tokens LiveKit.
+
+## Configuração
+
+O Worker requer as bindings `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET`. As duas credenciais devem permanecer como secrets. Para aceitar origens adicionais, configure `ALLOWED_ORIGINS` como uma lista separada por vírgulas.
+
+O frontend usa `https://kpnc-meet-api.workers.dev` por padrão. Caso a conta use outro subdomínio `workers.dev`, defina `window.KPNC_API_URL` antes de `/js/app.js` no `public/index.html`.
+
+## Validação e deploy
 
 ```bash
-npm install
-npm start
+pnpm install
+pnpm run check
+pnpm run worker:deploy
 ```
 
-Abra `http://localhost:3000`.
+O deploy usa `--keep-vars`, preservando as variáveis e secrets já configurados no painel.
 
-## Produção
-
-Para produção, use HTTPS. A API `getDisplayMedia()` exige contexto seguro (HTTPS, exceto localhost). O navegador também exige uma ação explícita do usuário para iniciar a captura.
-
-Para conexões reais entre redes diferentes, configure um servidor TURN e adicione suas credenciais em `public/js/app.js`, na constante `rtcConfig`:
-
-```js
-const rtcConfig = {
-  iceServers: [
-    { urls: "stun:seu-stun.example" },
-    {
-      urls: "turn:seu-turn.example",
-      username: "usuario",
-      credential: "senha"
-    }
-  ]
-};
-```
-
-## Arquitetura
-
-O servidor (`server.js`) faz apenas signaling e gerenciamento de salas/chat. A mídia é enviada diretamente entre os participantes (peer-to-peer) via WebRTC. O servidor não processa vídeo ou áudio. O signaling troca SDP/ICE usando o padrão de "Negociação Perfeita" (Perfect Negotiation) para evitar conflitos quando várias transmissões começam ao mesmo tempo.
-
-Esta é uma implementação independente, sem copiar marca, identidade visual, textos ou assets de qualquer serviço de referência.
-
-## Limitação importante
-
-A arquitetura é mesh (P2P direto entre todos os participantes). Para salas pequenas, como 2-4 pessoas, é simples e barato. Para dezenas de espectadores, substitua a camada P2P por um SFU como mediasoup ou LiveKit.
-
----
-
-**Kpnc Telas** — desenvolvido por **Jp Dev's**.
+Esta é uma implementação independente, sem marca, textos ou assets proprietários de serviços de referência.

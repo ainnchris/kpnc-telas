@@ -1,18 +1,19 @@
 {
   "name": "kpnc-telas",
-  "version": "2.0.0",
-  "description": "Kpnc Telas - chamadas de voz, telas e cameras em tempo real usando WebRTC.",
-  "main": "server.js",
-  "author": "Jp Dev's",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Kpnc Telas — videoconferencias com Cloudflare Pages e LiveKit.",
   "license": "UNLICENSED",
   "scripts": {
-    "start": "node server.js"
+    "check": "tsc --noEmit -p worker/tsconfig.json && wrangler deploy --dry-run --config worker/wrangler.jsonc",
+    "worker:dev": "wrangler dev --config worker/wrangler.jsonc",
+    "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc --keep-vars",
+    "worker:types": "wrangler types --config worker/wrangler.jsonc worker/worker-configuration.d.ts"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.17.0"
+  "dependencies": { "livekit-server-sdk": "^2.18.0" },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260827.1",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.127.0"
   }
 }

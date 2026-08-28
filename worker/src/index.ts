@@ -1,13 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
 
 const encoder = new TextEncoder();
-const MAX_BODY_BYTES = 4096;
+const MAX_BODY_BYTES = 16 * 1024;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000;
 const REQUEST_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_ORIGINS = ['https://kpnc-meet.pages.dev', 'http://localhost:3000', 'http://localhost:8788'];
 
 type JoinStatus = 'waiting' | 'approved' | 'denied';
-type JoinRequest = { id: string; name: string; secretHash: string; status: JoinStatus; createdAt: number };
+type JoinRequest = { id: string; name: string; avatar: string; secretHash: string; status: JoinStatus; createdAt: number };
 type RoomState = { hostHash: string; createdAt: number; closed: boolean; requests: Record<string, JoinRequest> };
 
 export class RoomCoordinator extends DurableObject<Env> {
@@ -30,11 +30,11 @@ export class RoomCoordinator extends DurableObject<Env> {
     await this.ctx.storage.put('room', room);
     return 'created';
   }
-  async requestStatus(id: string, secretHash: string): Promise<{ status: JoinStatus; name: string } | null> {
+  async requestStatus(id: string, secretHash: string): Promise<{ status: JoinStatus; name: string; avatar: string } | null> {
     const room = await this.ctx.storage.get<RoomState>('room');
     const item = room?.requests[id];
     if (!room || room.closed || !item || !secureEqual(item.secretHash, secretHash) || Date.now() - item.createdAt >= REQUEST_TTL_MS) return null;
-    return { status: item.status, name: item.name };
+    return { status: item.status, name: item.name, avatar: item.avatar };
   }
   async pending(hostHash: string): Promise<Array<{ id: string; name: string; createdAt: number }>> {
     const room = await this.authorize(hostHash);
@@ -56,6 +56,7 @@ export class RoomCoordinator extends DurableObject<Env> {
     room.requests = {};
     await this.ctx.storage.put('room', room);
   }
+  async hostAuthorized(hostHash: string): Promise<boolean> { await this.authorize(hostHash); return true; }
   async alarm(): Promise<void> { await this.ctx.storage.deleteAll(); }
   private async authorize(hostHash: string): Promise<RoomState> {
     const room = await this.ctx.storage.get<RoomState>('room');
@@ -78,6 +79,10 @@ function allowedOrigin(request: Request, env: Env): string | null {
 function responseHeaders(origin: string | null): HeadersInit { return { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': origin || DEFAULT_ORIGINS[0], 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', Vary: 'Origin', 'X-Content-Type-Options': 'nosniff' }; }
 function json(data: unknown, status: number, origin: string | null): Response { return new Response(JSON.stringify(data), { status, headers: responseHeaders(origin) }); }
 function clean(value: unknown, max: number): string { return typeof value === 'string' ? value.trim().replace(/[<>\u0000-\u001f]/g, '').slice(0, max) : ''; }
+function cleanAvatar(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 12_000) return '';
+  return /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value) ? value : '';
+}
 function secureEqual(left: string, right: string): boolean { if (left.length !== right.length) return false; let difference = 0; for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index); return difference === 0; }
 function base64Url(bytes: Uint8Array): string { let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function randomToken(bytes = 24): string { return base64Url(crypto.getRandomValues(new Uint8Array(bytes))); }
@@ -93,14 +98,20 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
 }
 function encodePart(value: unknown): string { return base64Url(encoder.encode(JSON.stringify(value))); }
 async function sha256(value: string): Promise<string> { return base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))); }
-async function issueToken(env: Env, room: string, name: string, host: boolean): Promise<string> {
-  const now = Math.floor(Date.now() / 1000); const identity = `${host ? 'host' : 'guest'}-${crypto.randomUUID()}`;
-  const header = encodePart({ alg: 'HS256', typ: 'JWT' });
-  const payload = encodePart({ exp: now + 6 * 60 * 60, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name, metadata: JSON.stringify({ host }), video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: host } });
-  const unsigned = `${header}.${payload}`;
+async function signedToken(env: Env, payload: Record<string, unknown>): Promise<string> {
+  const header = encodePart({ alg: 'HS256', typ: 'JWT' }); const body = encodePart(payload); const unsigned = `${header}.${body}`;
   const key = await crypto.subtle.importKey('raw', encoder.encode(env.LIVEKIT_API_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(unsigned));
-  return `${unsigned}.${base64Url(new Uint8Array(signature))}`;
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(unsigned)); return `${unsigned}.${base64Url(new Uint8Array(signature))}`;
+}
+async function issueToken(env: Env, room: string, name: string, host: boolean, avatar = ''): Promise<string> {
+  const now = Math.floor(Date.now() / 1000); const identity = `${host ? 'host' : 'guest'}-${crypto.randomUUID()}`;
+  return signedToken(env, { exp: now + 6 * 60 * 60, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name, metadata: JSON.stringify({ host, avatar }), video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true, roomAdmin: host } });
+}
+async function roomService(env: Env, room: string, method: 'RemoveParticipant' | 'MutePublishedTrack', body: Record<string, unknown>): Promise<void> {
+  const now = Math.floor(Date.now() / 1000); const token = await signedToken(env, { exp: now + 300, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: `kpnc-admin-${crypto.randomUUID()}`, video: { roomAdmin: true, room } });
+  const base = env.LIVEKIT_URL.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:').replace(/\/$/, '');
+  const response = await fetch(`${base}/twirp/livekit.RoomService/${method}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!response.ok) throw new Error('LIVEKIT_ADMIN_FAILED');
 }
 function coordinator(env: Env, room: string): DurableObjectStub<RoomCoordinator> { return env.ROOMS.getByName(room) as DurableObjectStub<RoomCoordinator>; }
 function bearer(request: Request): string { return (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, ''); }
@@ -114,18 +125,18 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, rooms: true }, 200, origin);
     try {
       if (request.method === 'POST' && url.pathname === '/api/rooms') {
-        const body = await readBody(request); const name = clean(body.name, 48);
+        const body = await readBody(request); const name = clean(body.name, 48); const avatar = cleanAvatar(body.avatar);
         if (name.length < 2) return json({ error: 'Informe um nome com pelo menos 2 caracteres.' }, 400, origin);
         let room = ''; let hostKey = '';
         for (let attempt = 0; attempt < 5; attempt += 1) { room = roomCode(); hostKey = randomToken(); if (await coordinator(env, room).create(await sha256(hostKey))) break; room = ''; }
         if (!room) throw new Error('ROOM_CREATE_FAILED');
-        return json({ token: await issueToken(env, room, name, true), url: env.LIVEKIT_URL, room, host: true, hostKey }, 201, origin);
+        return json({ token: await issueToken(env, room, name, true, avatar), url: env.LIVEKIT_URL, room, host: true, hostKey }, 201, origin);
       }
       if (request.method === 'POST' && url.pathname === '/api/join-requests') {
-        const body = await readBody(request); const name = clean(body.name, 48); const room = clean(body.room, 64).toLowerCase();
+        const body = await readBody(request); const name = clean(body.name, 48); const avatar = cleanAvatar(body.avatar); const room = clean(body.room, 64).toLowerCase();
         if (name.length < 2 || !/^[a-z0-9-]{6,64}$/.test(room)) return json({ error: 'Nome ou código inválido.' }, 400, origin);
         const id = crypto.randomUUID(); const secret = randomToken();
-        const result = await coordinator(env, room).requestJoin({ id, name, secretHash: await sha256(secret), status: 'waiting', createdAt: Date.now() });
+        const result = await coordinator(env, room).requestJoin({ id, name, avatar, secretHash: await sha256(secret), status: 'waiting', createdAt: Date.now() });
         if (result === 'missing') return json({ error: 'Esta reunião não existe ou já foi encerrada.', code: 'ROOM_NOT_FOUND' }, 404, origin);
         return json({ room, requestId: id, requestSecret: secret, status: 'waiting' }, 202, origin);
       }
@@ -135,7 +146,7 @@ export default {
         const status = await coordinator(env, room).requestStatus(statusMatch[1], await sha256(secret));
         if (!status) return json({ error: 'Solicitação expirada ou reunião encerrada.', code: 'REQUEST_EXPIRED' }, 404, origin);
         if (status.status !== 'approved') return json({ status: status.status }, 200, origin);
-        return json({ status: 'approved', token: await issueToken(env, room, status.name, false), url: env.LIVEKIT_URL, room, host: false }, 200, origin);
+        return json({ status: 'approved', token: await issueToken(env, room, status.name, false, status.avatar), url: env.LIVEKIT_URL, room, host: false }, 200, origin);
       }
       const pendingMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/requests$/i);
       if (request.method === 'GET' && pendingMatch) return json({ requests: await coordinator(env, pendingMatch[1]).pending(await sha256(bearer(request))) }, 200, origin);
@@ -147,6 +158,15 @@ export default {
       }
       const closeMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/close$/i);
       if (request.method === 'POST' && closeMatch) { await coordinator(env, closeMatch[1]).close(await sha256(bearer(request))); return json({ ok: true }, 200, origin); }
+      const participantMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/participants\/([^/]+)\/(remove|mute)$/i);
+      if (request.method === 'POST' && participantMatch) {
+        const room = participantMatch[1]; const identity = clean(decodeURIComponent(participantMatch[2]), 128); const action = participantMatch[3];
+        await coordinator(env, room).hostAuthorized(await sha256(bearer(request)));
+        if (!identity) return json({ error: 'Participante inválido.' }, 400, origin);
+        if (action === 'remove') await roomService(env, room, 'RemoveParticipant', { room, identity });
+        else { const body = await readBody(request); const trackSid = clean(body.trackSid, 128); if (!/^TR_[a-z0-9]+$/i.test(trackSid)) return json({ error: 'Faixa de áudio inválida.' }, 400, origin); await roomService(env, room, 'MutePublishedTrack', { room, identity, track_sid: trackSid, muted: true }); }
+        return json({ ok: true }, 200, origin);
+      }
       return json({ error: 'Rota não encontrada.' }, 404, origin);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown'; console.error(JSON.stringify({ event: 'api_error', path: url.pathname, message }));
@@ -155,4 +175,3 @@ export default {
     }
   }
 } satisfies ExportedHandler<Env>;
-

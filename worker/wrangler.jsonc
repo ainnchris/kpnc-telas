@@ -5,6 +5,15 @@
   "compatibility_date": "2026-08-27",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
+  "vars": {
+    "LIVEKIT_URL": "wss://kpnc-projects-01lpu7f8.livekit.cloud",
+    "ALLOWED_ORIGINS": "https://kpnc-meet.pages.dev,http://localhost:3000,http://localhost:8788"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "RoomCoordinator" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomCoordinator"] }],
   "secrets": { "required": ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }
+

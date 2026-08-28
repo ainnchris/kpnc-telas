@@ -1,6 +1,7 @@
 node_modules/
 .wrangler/
 .wrangler-config/
+work/
 .dev.vars*
 .env*
 *.log

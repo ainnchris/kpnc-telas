@@ -5,4 +5,11 @@ work/
 .dev.vars*
 .env*
 *.log
-
+dist/
+.expo/
+apps/mobile/android/
+apps/mobile/ios/
+*.keystore
+*.jks
+*.p12
+*.mobileprovision

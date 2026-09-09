@@ -1,0 +1,62 @@
+name: Aplicativos de teste
+on:
+  push:
+    branches: [feat/meet-multiplataforma]
+    paths: [apps/**, pnpm-lock.yaml, pnpm-workspace.yaml, .github/workflows/apps.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - run: pnpm install --frozen-lockfile
+      - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs
+      - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: pnpm --filter kpnc-meet-desktop dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kpnc-Meet-Windows-experimental
+          path: apps/desktop/dist/*.exe
+          if-no-files-found: error
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: node node_modules/expo/bin/cli prebuild --platform android --no-install
+        working-directory: apps/mobile
+      # Expo's generated release variant uses a debug signing key for preview only.
+      # A production upload requires a user-owned release key / Play App Signing.
+      - run: ./gradlew assembleRelease --no-daemon
+        working-directory: apps/mobile/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kpnc-Meet-Android-experimental
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

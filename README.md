@@ -1,6 +1,10 @@
-# Kpnc Telas
+# Kpnc Meet
 
 Videoconferências no navegador com identidade própria, Cloudflare Pages no frontend, Cloudflare Workers na API e LiveKit Cloud como SFU.
+
+## Aplicativos multiplataforma (em desenvolvimento)
+
+Os clientes Windows e Android/iOS estão em `apps/desktop` e `apps/mobile`. Consulte [estado, builds e pendências](docs/APLICATIVOS.md). Eles ainda são experimentais: gerar código ou bundles JavaScript não comprova chamadas funcionando nos aparelhos. O site em produção e as branches de backup não são alterados por este desenvolvimento.
 
 ## Recursos
 
@@ -36,4 +40,3 @@ pnpm run worker:deploy
 O deploy usa `--keep-vars`, preservando as variáveis e secrets já configurados no painel.
 
 Esta é uma implementação independente, sem marca, textos ou assets proprietários de serviços de referência.
-

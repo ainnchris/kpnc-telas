@@ -45,11 +45,11 @@ module.exports = function withBroadcast(config) {
       project.addToPbxGroup(fileGroup.uuid,project.getFirstProject().firstProject.mainGroup);
       project.addBuildPhase([],'PBXSourcesBuildPhase','Sources',target.uuid);
       project.addBuildPhase([],'PBXFrameworksBuildPhase','Frameworks',target.uuid);
-      project.addBuildPhase([],'PBXResourcesBuildPhase','Resources',target.uuid);
+      // Modern Expo projects have no legacy group named "Resources". Add the
+      // extension's resource phase directly instead of using addResourceFile.
+      project.addBuildPhase([`${TARGET}/LICENSE`,`${TARGET}/NOTICE`],'PBXResourcesBuildPhase','Resources',target.uuid);
       for(const file of FILES)project.addSourceFile(file,{target:target.uuid},fileGroup.uuid);
       for(const framework of ['ReplayKit.framework','CoreImage.framework','CFNetwork.framework'])project.addFramework(framework,{target:target.uuid});
-      project.addResourceFile(`${TARGET}/LICENSE`,{target:target.uuid});
-      project.addResourceFile(`${TARGET}/NOTICE`,{target:target.uuid});
     }
     const list=project.pbxXCConfigurationList()[target.pbxNativeTarget.buildConfigurationList];
     for(const {value} of list.buildConfigurations){

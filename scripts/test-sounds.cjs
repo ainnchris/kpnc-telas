@@ -20,3 +20,15 @@ test('sounds are lazy, throttled, optional and persisted',async()=>{
  time+=1000;await window.MeetSounds.play('leave');assert.deepEqual(tones.slice(-2),[520,350]);
  assert.equal(contexts,1);
 });
+test('waiting sound detects new request IDs, not just an increased count',()=>{
+ const app=fs.readFileSync(path.join(__dirname,'../public/js/app.js'),'utf8');
+ const source=app.slice(app.indexOf('function renderPending(rs)'),app.indexOf(' async function decide'));
+ let alerts=0;
+ const node={classList:{toggle(){},remove(){}},replaceChildren(){},querySelector(){return null},append(){}};
+ const state={pendingCount:0,pendingIds:new Set()},context={state,sound:()=>alerts++,toast(){},openPanel(){},admission:node,el:{waitingList:node},pendingRows:()=>[],document:{createElement:()=>({...node})},$:()=>node,Set};
+ vm.runInNewContext(source,context);
+ context.renderPending([{id:'a',name:'A'}]);assert.equal(alerts,1);
+ context.renderPending([{id:'a',name:'A'}]);assert.equal(alerts,1);
+ context.renderPending([{id:'b',name:'B'}]);assert.equal(alerts,2);
+ context.renderPending([]);assert.equal(alerts,2);
+});

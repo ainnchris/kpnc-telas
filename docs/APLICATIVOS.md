@@ -10,6 +10,15 @@ Desenvolvimento isolado em `feat/meet-multiplataforma`, a partir do commit `2834
 - Android/iOS usam React Native, Expo e o SDK nativo LiveKit. Não são WebViews e não funcionam no Expo Go.
 - Os clientes usam a API existente. Chaves de assinatura, hostKey e tokens de reunião nunca devem ser commitados. O hostKey permanece somente na memória do cliente durante a reunião.
 
+## Validação em 9 de setembro de 2026
+
+- Build dos três aplicativos concluído: [GitHub Actions 34368150136](https://github.com/ainnchris/kpnc-telas/actions/runs/34368150136), código `c39fc20`.
+- Windows: instalador NSIS experimental gerado; [teste de carregamento em Windows CI](https://github.com/ainnchris/kpnc-telas/actions/runs/34368819290) aprovado, incluindo interface, LiveKit e ausência de Node exposto à página. A falha gráfica local descrita abaixo continua sendo uma limitação deste computador.
+- Android: APK experimental compilado; assinatura de desenvolvimento, não de distribuição definitiva.
+- iOS: aplicativo e Broadcast Upload Extension compilados para simulador, sem assinatura. O artefato **não pode ser instalado em um iPhone físico**.
+- Oito testes automatizados e checagem TypeScript aprovados; sete etapas de integração com a API real aprovadas (sala inexistente, criação, espera, autorização do anfitrião, admissão, recusa e encerramento). Salas temporárias encerradas após os testes.
+- Ainda não foram validadas chamadas reais entre aparelhos, captura de tela, reconexão e funcionamento em segundo plano. Compilação bem-sucedida não comprova esses comportamentos.
+
 ## Recursos no código
 
 | Recurso | Windows | Android | iOS |
@@ -19,7 +28,7 @@ Desenvolvimento isolado em `feat/meet-multiplataforma`, a partir do commit `2834
 | Chat, participantes, mão levantada | Interface web existente | Implementado | Implementado |
 | Perfil local, foto, tema claro/escuro | Perfil próprio do aplicativo | Implementado | Implementado |
 | Ampliar uma transmissão | Interface web existente | Implementado | Implementado |
-| Enviar tela | Seletor de monitor/janela | SDK + serviço de captura configurado | Extensão e seletor implementados; **aguarda validação nativa/física** |
+| Enviar tela | Seletor de monitor/janela | SDK + serviço de captura configurado | Extensão compilada para simulador; **aguarda validação em iPhone físico** |
 | Áudio da apresentação | Loopback Windows com consentimento | Não validado; não garantido | O transporte da extensão envia vídeo, **não áudio de outros apps** |
 | Inverter câmera / escolher saída de áudio | Preferências web existentes | Implementado | Implementado |
 | Continuidade em segundo plano | Depende de manter a janela/processo aberto | **Pendente: serviço de chamada** | Áudio configurado; **pendente: CallKit e testes** |
@@ -110,3 +119,4 @@ Um executável não reduz automaticamente o ping nem elimina lag. A rede, o SFU,
 - https://github.com/livekit/client-sdk-react-native#background-processing
 - https://www.electronjs.org/docs/latest/tutorial/security
 - https://www.electronjs.org/docs/latest/api/session#sessetdisplaymediarequesthandlerhandler-opts
+

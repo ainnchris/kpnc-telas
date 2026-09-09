@@ -52,7 +52,7 @@ ipcMain.on('capture:select', (event, selection) => {
 function sendAction(id) { if (main && !main.isDestroyed() && isMeetURL(main.webContents.getURL())) main.webContents.send('meet:action',id); }
 async function createWindow() {
   const smokeTest = !app.isPackaged && process.argv.includes('--smoke-test');
-  main = new BrowserWindow({show:!smokeTest,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/favicon.png'),
+  main = new BrowserWindow({show:!smokeTest,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/icon.ico'),
     webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:'persist:kpnc-meet'}});
   const ses = session.fromPartition('persist:kpnc-meet');
   ses.setPermissionCheckHandler((wc, permission, origin, details) => {
@@ -87,11 +87,15 @@ async function createWindow() {
     if (choice.response === 0) void main.loadURL(SITE).catch(()=>{}); else main.close();
   });
   main.on('closed',()=>{finishCapture();main=null;});
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {label:'Kpnc Meet',submenu:[{label:'Abrir no navegador',click:()=>shell.openExternal(SITE)},{type:'separator'},{role:'quit',label:'Sair'}]},
-    {label:'Reunião',submenu:[{label:'Microfone',accelerator:'CmdOrCtrl+Shift+M',click:()=>sendAction('mic')},{label:'Câmera',accelerator:'CmdOrCtrl+Shift+V',click:()=>sendAction('camera')},{label:'Chat',accelerator:'CmdOrCtrl+Shift+C',click:()=>sendAction('chat-toggle')}]},
-    {label:'Exibir',submenu:[{role:'togglefullscreen',label:'Tela cheia'},{role:'resetZoom'},{role:'zoomIn'},{role:'zoomOut'}]}
-  ]));
+  Menu.setApplicationMenu(null);
+  main.setMenu(null);
+  main.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.isAutoRepeat) return;
+    const key = input.key.toLowerCase();
+    const action = {m:'mic',v:'camera',c:'chat-toggle'}[key];
+    if (input.control && input.shift && !input.alt && action) {event.preventDefault();sendAction(action);}
+    if (key === 'f11') {event.preventDefault();main.setFullScreen(!main.isFullScreen());}
+  });
   await main.loadURL(startupLink).catch(()=>{});
   if (smokeTest) {
     const result = await main.webContents.executeJavaScript(`({title:document.title,home:!!document.getElementById('new-meeting'),livekit:!!window.LivekitClient,nodeExposed:typeof require!=='undefined',chatButton:!!document.getElementById('chat-toggle')})`);

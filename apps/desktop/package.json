@@ -1,19 +1,19 @@
 {
   "name": "kpnc-meet-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Kpnc Meet para Windows",
   "author": "Kpnc",
   "main": "main.cjs",
-  "scripts": {"start":"electron .", "test":"node --test test/*.test.cjs", "dist":"electron-builder --win nsis --x64 --publish never"},
+  "scripts": {"start":"electron .", "test":"node --test test/*.test.cjs", "dist":"node build-icon.cjs && electron-builder --win nsis --x64 --publish never"},
   "devDependencies": {"electron":"44.3.0", "electron-builder":"26.15.3"},
   "build": {
     "appId":"dev.kpnc.meet", "productName":"Kpnc Meet",
     "directories":{"output":"dist"},
     "files":["*.cjs", "picker.html", "picker.css", "picker.js", "assets/**"],
     "asar":true,
-    "win":{"target":"nsis"},
-    "nsis":{"oneClick":false,"perMachine":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true},
+    "win":{"target":"nsis","icon":"assets/icon.ico"},
+    "nsis":{"installerIcon":"assets/icon.ico","uninstallerIcon":"assets/icon.ico","oneClick":false,"perMachine":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true},
     "protocols":[{"name":"Kpnc Meet","schemes":["kpncmeet"]}]
   }
 }

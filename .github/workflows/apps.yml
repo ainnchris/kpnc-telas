@@ -10,6 +10,32 @@ concurrency:
   group: apps-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  ios-simulator:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: node node_modules/expo/bin/cli prebuild --platform ios --no-install
+        working-directory: apps/mobile
+      - run: pod install
+        working-directory: apps/mobile/ios
+      - run: xcodebuild -workspace apps/mobile/ios/KpncMeet.xcworkspace -scheme KpncMeet -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath apps/mobile/ios/build CODE_SIGNING_ALLOWED=NO
+      - run: ditto -c -k --sequesterRsrc --keepParent apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/KpncMeet.app apps/mobile/Kpnc-Meet-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kpnc-Meet-iOS-simulator-not-for-iPhone
+          path: apps/mobile/Kpnc-Meet-simulator.zip
+          if-no-files-found: error
   windows:
     runs-on: windows-latest
     timeout-minutes: 25

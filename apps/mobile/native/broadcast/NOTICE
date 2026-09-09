@@ -1,0 +1,7 @@
+Screen broadcast transport derived from Jitsi Meet SDK samples:
+https://github.com/jitsi/jitsi-meet-sdk-samples/tree/18c35f7625b38233579ff34f761f4c126ba7e03a/ios/swift-screensharing
+
+Copyright notices for 8x8, Atlassian and original authors are retained in each source file.
+Apache License 2.0 (LICENSE).
+Kpnc modifications: configurable app group, bounded startup retry, UNIX socket address initialization and failed-frame recovery.
+This transport forwards screen video only. It does not forward other applications' audio.

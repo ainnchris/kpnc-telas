@@ -19,11 +19,11 @@ Desenvolvimento isolado em `feat/meet-multiplataforma`, a partir do commit `2834
 | Chat, participantes, mão levantada | Interface web existente | Implementado | Implementado |
 | Perfil local, foto, tema claro/escuro | Perfil próprio do aplicativo | Implementado | Implementado |
 | Ampliar uma transmissão | Interface web existente | Implementado | Implementado |
-| Enviar tela | Seletor de monitor/janela | SDK + serviço de captura configurado | **Pendente: Broadcast Extension** |
-| Áudio da apresentação | Loopback Windows com consentimento | Não validado; não garantido | Pendente |
+| Enviar tela | Seletor de monitor/janela | SDK + serviço de captura configurado | Extensão e seletor implementados; **aguarda validação nativa/física** |
+| Áudio da apresentação | Loopback Windows com consentimento | Não validado; não garantido | O transporte da extensão envia vídeo, **não áudio de outros apps** |
 | Inverter câmera / escolher saída de áudio | Preferências web existentes | Implementado | Implementado |
 | Continuidade em segundo plano | Depende de manter a janela/processo aberto | **Pendente: serviço de chamada** | Áudio configurado; **pendente: CallKit e testes** |
-| Prévia de câmera antes da entrada | Interface web existente | **Pendente**; há seleção de estados desligados/ligados | **Pendente**; há seleção de estados |
+| Prévia de câmera antes da entrada | Interface web existente | Implementada, com ativação explícita | Implementada, com ativação explícita |
 | Legendas, gravação composta, efeitos nativos | Recursos/limitações do site atual | **Pendente** | **Pendente** |
 | Atualização automática do binário | **Pendente: canal assinado**; site atualiza online | Lojas/distribuição pendentes | Lojas/distribuição pendentes |
 
@@ -84,7 +84,7 @@ Para TestFlight/App Store, o proprietário precisa da conta Apple Developer e co
 
 Antes de chamar iOS de completo, adicionar e validar:
 
-1. Broadcast Upload Extension, App Group e integração do seletor de captura do SDK.
+1. Validar a Broadcast Upload Extension gerada pelo plugin `with-broadcast`, App Group e seletor de captura em um iPhone físico. A extensão usa o transporte de vídeo do exemplo Jitsi recomendado pelo SDK LiveKit; licença e atribuições estão em `apps/mobile/native/broadcast`.
 2. Continuidade da chamada com CallKit, interrupções e rotas Bluetooth.
 3. Assinatura do aplicativo e extensão com a mesma equipe Apple.
 4. Testes em iPhone físico; o simulador não comprova câmera/microfone nem captura de tela.

@@ -1,12 +1,14 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, Image, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View} from 'react-native';
+import {Alert, findNodeHandle, Image, Linking, Modal, NativeModules, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View} from 'react-native';
+import {MediaStream as NativeMediaStream, RTCView, ScreenCapturePickerView} from '@livekit/react-native-webrtc';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Ionicons} from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import {StatusBar} from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import {AudioSession, LiveKitRoom, VideoTrack, isTrackReference, useRoomContext, useTracks} from '@livekit/react-native';
-import {LocalVideoTrack, Participant, RoomEvent, Track} from 'livekit-client';
+import {createLocalVideoTrack, LocalVideoTrack, Participant, RoomEvent, Track} from 'livekit-client';
 import {api, ApiError, Auth, JoinRequest, Pending, post, Profile, roomCode, WEBSITE} from './api';
 
 type Glyph = React.ComponentProps<typeof Ionicons>['name'];
@@ -33,10 +35,25 @@ export default function App() {
   const [screen,setScreen]=useState<'home'|'preview'|'waiting'|'meeting'>('home');
   const [mode,setMode]=useState<'create'|'join'>('create'),[code,setCode]=useState('');
   const [mic,setMic]=useState(false),[camera,setCamera]=useState(false);
+  const [previewURL,setPreviewURL]=useState('');
+  const [previewRevision,setPreviewRevision]=useState(0);
+  const stopPreview=useRef<()=>void>(()=>{});
   const [request,setRequest]=useState<JoinRequest|null>(null),[auth,setAuth]=useState<Auth|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const operation=useRef(0);
   const c=darkMode?dark:light;
+  useEffect(()=>{void SystemUI.setBackgroundColorAsync(c.bg).catch(()=>{})},[c.bg]);
+  useEffect(()=>{
+    if(screen!=='preview'||!camera)return;
+    let cancelled=false;let track:LocalVideoTrack|undefined;
+    const cleanup=()=>{cancelled=true;track?.stop();setPreviewURL('')};
+    stopPreview.current=cleanup;
+    void createLocalVideoTrack({facingMode:'user'}).then(result=>{
+      if(cancelled){result.stop();return}
+      track=result;setPreviewURL((result.mediaStream as unknown as NativeMediaStream)?.toURL()||'');
+    }).catch(error=>{if(!cancelled){setCamera(false);setError(errorMessage(error))}});
+    return cleanup;
+  },[screen,camera,previewRevision]);
   useEffect(()=>{let active=true;AsyncStorage.multiGet(['kpnc-profile','kpnc-theme']).then(values=>{
     if(!active)return;
     try{const p=JSON.parse(values[0][1]||'{}');setProfile({name:typeof p.name==='string'?p.name.slice(0,48):'',avatar:typeof p.avatar==='string'&&p.avatar.length<=12000?p.avatar:''})}catch{}
@@ -48,7 +65,7 @@ export default function App() {
     void Linking.getInitialURL().then(receive);
     const listener=Linking.addEventListener('url',e=>receive(e.url));return()=>listener.remove();
   },[]);
-  const reset=useCallback(()=>{operation.current++;setRequest(null);setAuth(null);setScreen('home');setBusy(false);setMic(false);setCamera(false);void AudioSession.stopAudioSession()},[]);
+  const reset=useCallback(()=>{operation.current++;stopPreview.current();setRequest(null);setAuth(null);setScreen('home');setBusy(false);setMic(false);setCamera(false);void AudioSession.stopAudioSession().catch(()=>{})},[]);
   useEffect(()=>{
     if(screen!=='waiting'||!request)return;
     let active=true;let timer:ReturnType<typeof setTimeout>;const controller=new AbortController();
@@ -66,6 +83,7 @@ export default function App() {
   },[request,screen,reset]);
   async function enter(){
     if(busy)return;
+    stopPreview.current();
     const attempt=++operation.current;
     setBusy(true);setError('');
     try {
@@ -83,7 +101,7 @@ export default function App() {
         if(attempt===operation.current){setRequest(result);setScreen('waiting')}
       }
     }catch(error){if(attempt===operation.current)setError(errorMessage(error))}
-    finally{if(attempt===operation.current)setBusy(false)}
+    finally{if(attempt===operation.current){setBusy(false);setPreviewRevision(n=>n+1)}}
   }
   async function choosePhoto(){
     try {
@@ -102,6 +120,7 @@ export default function App() {
       {screen==='waiting' ? <View style={s.section}><Ionicons name="hourglass-outline" size={54} color={c.accent}/><Text style={[s.title,{color:c.text}]}>Aguardando o anfitrião</Text><Text style={{color:c.muted}}>Sua solicitação foi enviada. Você entrará quando ela for aceita.</Text><Text style={{color:c.muted}}>{request?.room}</Text><Button label="Cancelar" icon="close-outline" onPress={reset}/></View> : <>
       {screen==='preview'&&<Button label="Voltar" icon="arrow-back-outline" onPress={reset} disabled={busy}/>}
       <Text style={[s.title,{color:c.text}]}>{screen==='home'?'Conversas que aproximam.':'Como você quer entrar?'}</Text>
+      {screen==='preview'&&!!previewURL&&<RTCView streamURL={previewURL} objectFit="cover" mirror style={{width:'100%',height:240,borderRadius:20}}/>}
       <View style={[s.profile,{backgroundColor:c.surface,borderColor:c.border}]}><Avatar profile={profile}/><View style={s.row}><Button label="Foto" icon="image-outline" onPress={choosePhoto}/>{!!profile.avatar&&<Button label="Remover" icon="trash-outline" onPress={()=>setProfile(p=>({...p,avatar:''}))}/>}</View><TextInput accessibilityLabel="Seu nome" placeholder="Seu nome" placeholderTextColor={c.muted} maxLength={48} value={profile.name} onChangeText={name=>setProfile(p=>({...p,name}))} style={[s.input,{color:c.text,borderColor:c.border}]}/><Text style={{color:c.muted}}>Seu perfil fica salvo neste aparelho.</Text></View>
       {screen==='home'?<View style={s.section}><Button label="Nova reunião" icon="add-circle-outline" onPress={()=>{setMode('create');setError('');setScreen('preview')}}/><TextInput accessibilityLabel="Código ou link da reunião" placeholder="Código ou link da reunião" placeholderTextColor={c.muted} value={code} onChangeText={setCode} autoCapitalize="none" autoCorrect={false} style={[s.input,{color:c.text,borderColor:c.border}]}/><Button label="Participar" icon="enter-outline" disabled={!roomCode(code)} onPress={()=>{setMode('join');setError('');setScreen('preview')}}/><Text style={{color:c.muted}}>Windows, navegador, Android e iPhone nas mesmas salas.</Text></View>:<View style={s.section}>
         <Text style={{color:c.muted}}>Câmera e microfone começam desligados. Ative somente se desejar.</Text>
@@ -123,6 +142,8 @@ function Meeting({auth,onLeave}:{auth:Auth;onLeave:()=>void}) {
   const [raised,setRaised]=useState<Set<string>>(new Set()),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [focused,setFocused]=useState<string|null>(null),[unread,setUnread]=useState(0);
   const [facing,setFacing]=useState<'user'|'environment'>('user');
+  const screenCaptureRef=useRef<React.ElementRef<typeof ScreenCapturePickerView>>(null);
+  const [audioOutputs,setAudioOutputs]=useState<string[]|null>(null);
   const panelRef=useRef(panel);panelRef.current=panel;
   const connected=connection==='connected';
   const participants=[room.localParticipant,...Array.from(room.remoteParticipants.values())];
@@ -162,11 +183,20 @@ function Meeting({auth,onLeave}:{auth:Auth;onLeave:()=>void}) {
   async function send(){const text=draft.trim().slice(0,500);if(!text)return;await publish('chat',{text,name:room.localParticipant.name,at:Date.now()});setMessages(items=>[...items,{id:`${Date.now()}-local`,name:'Você',text}].slice(-200));setDraft('')}
   async function hand(){const id=room.localParticipant.identity,on=!raised.has(id);await publish('hand',{raised:on});setRaised(current=>{const next=new Set(current);on?next.add(id):next.delete(id);return next})}
   async function switchCamera(){const track=room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;if(track instanceof LocalVideoTrack){const next=facing==='user'?'environment':'user';await track.restartTrack({facingMode:next});setFacing(next)}}
+  async function screenShare(){
+    const participant=room.localParticipant;
+    if(participant.isScreenShareEnabled){await participant.setScreenShareEnabled(false);return}
+    if(Platform.OS==='ios'){
+      const node=findNodeHandle(screenCaptureRef.current);
+      if(!node||!NativeModules.ScreenCapturePickerViewManager)throw new Error('O seletor de transmissão não está disponível neste aparelho.');
+      await NativeModules.ScreenCapturePickerViewManager.show(node);
+    }
+    await participant.setScreenShareEnabled(true);
+  }
   async function selectOutput(){
     if(Platform.OS==='ios'){await AudioSession.showAudioRoutePicker();return}
     const outputs=await AudioSession.getAudioOutputs();
-    const labels:Record<string,string>={speaker:'Alto-falante',earpiece:'Fone do aparelho',bluetooth:'Bluetooth',headset:'Fone de ouvido'};
-    Alert.alert('Saída de áudio','Escolha onde ouvir a reunião.',[...outputs.map(output=>({text:labels[output]||output,onPress:()=>void act(()=>AudioSession.selectAudioOutput(output))})),{text:'Cancelar',style:'cancel'}]);
+    setAudioOutputs(outputs);
   }
   const leave=()=>{void room.disconnect();onLeave()};
   const end=()=>Alert.alert('Encerrar para todos?','Todos os participantes sairão da reunião.',[{text:'Cancelar',style:'cancel'},{text:'Encerrar',style:'destructive',onPress:()=>void act(async()=>{await api(`/api/rooms/${auth.room}/close`,post({},auth.hostKey));await publish('room-control',{action:'end'});leave()})}]);
@@ -181,6 +211,7 @@ function Meeting({auth,onLeave}:{auth:Auth;onLeave:()=>void}) {
     <View style={s.tileCaption}><Ionicons name={item.participant.isMicrophoneEnabled?'mic':'mic-off'} size={16} color="white"/><Text numberOfLines={1} style={s.tileName}>{item.participant.name||'Participante'}{item.participant===room.localParticipant?' (você)':''}{raised.has(item.participant.identity)?' · ✋':''}</Text><Pressable accessibilityRole="button" accessibilityLabel={fullscreen?'Sair da tela cheia':'Ampliar transmissão'} onPress={()=>setFocused(fullscreen?null:item.key)}><Ionicons name={fullscreen?'contract-outline':'expand-outline'} color="white" size={25}/></Pressable></View>
   </View>;
   return <View style={s.root}>
+    {Platform.OS==='ios'&&<View style={{width:1,height:1,position:'absolute',overflow:'hidden'}} pointerEvents="none"><ScreenCapturePickerView ref={screenCaptureRef}/></View>}
     <View style={[s.meetingHeader,{borderColor:c.border}]}><View><Text style={[s.brand,{color:c.text}]}>Kpnc Meet</Text><Text style={{color:connected?'#43bb97':c.muted}}>{connected?'Conectado':connection==='reconnecting'?'Reconectando…':'Conectando…'} · {auth.room}</Text></View><Button label="Convidar" icon="link-outline" onPress={()=>void Share.share({message:`Entre no Kpnc Meet: ${WEBSITE}/?room=${auth.room}`})}/></View>
     <ScrollView contentContainerStyle={s.grid}>{tiles.map(item=>tile(item))}</ScrollView>
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
@@ -189,13 +220,14 @@ function Meeting({auth,onLeave}:{auth:Auth;onLeave:()=>void}) {
       <Button label="Câmera" icon={room.localParticipant.isCameraEnabled?'videocam':'videocam-off'} disabled={busy||!connected} onPress={()=>void act(()=>room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled))}/>
       {room.localParticipant.isCameraEnabled&&<Button label="Inverter" icon="camera-reverse-outline" disabled={busy||!connected} onPress={()=>void act(switchCamera)}/>}
       <Button label="Áudio" icon="volume-high-outline" disabled={busy||!connected} onPress={()=>void act(selectOutput)}/>
-      {Platform.OS==='android'&&<Button label={room.localParticipant.isScreenShareEnabled?'Parar tela':'Apresentar'} icon="easel-outline" disabled={busy||!connected} onPress={()=>void act(()=>room.localParticipant.setScreenShareEnabled(!room.localParticipant.isScreenShareEnabled))}/>}
+      <Button label={room.localParticipant.isScreenShareEnabled?'Parar tela':'Apresentar'} icon="easel-outline" disabled={busy||!connected} onPress={()=>void act(screenShare)}/>
       <Button label={raised.has(room.localParticipant.identity)?'Baixar mão':'Mão'} icon="hand-left-outline" disabled={busy||!connected} onPress={()=>void act(hand)}/>
       <Button label={`Pessoas${pending.length?` (${pending.length})`:''}`} icon="people-outline" onPress={()=>setPanel('people')}/>
       <Button label={`Chat${unread?` (${unread})`:''}`} icon="chatbubble-outline" onPress={()=>{setPanel('chat');setUnread(0)}}/>
       <Button label="Sair" icon="call-outline" danger onPress={leave}/>
     </View>
     <Modal visible={focused!==null} onRequestClose={()=>setFocused(null)} supportedOrientations={['portrait','landscape']}><SafeAreaView style={[s.root,{backgroundColor:'#080c12'}]}>{tiles.find(t=>t.key===focused)?tile(tiles.find(t=>t.key===focused)!,true):<Text style={{color:'white',padding:24}}>A transmissão terminou.</Text>}<Button label="Voltar à reunião" icon="contract-outline" onPress={()=>setFocused(null)}/></SafeAreaView></Modal>
+    <Modal visible={audioOutputs!==null} onRequestClose={()=>setAudioOutputs(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.section}><Text style={[s.title,{color:c.text}]}>Saída de áudio</Text>{audioOutputs?.map(output=><Button key={output} label={({speaker:'Alto-falante',earpiece:'Fone do aparelho',bluetooth:'Bluetooth',headset:'Fone de ouvido'} as Record<string,string>)[output]||output} icon="volume-high-outline" disabled={busy} onPress={()=>void act(async()=>{await AudioSession.selectAudioOutput(output);setAudioOutputs(null)})}/>)}<Button label="Voltar" icon="arrow-back-outline" onPress={()=>setAudioOutputs(null)}/></View></SafeAreaView></Modal>
     <Modal visible={panel!==null} animationType="slide" onRequestClose={()=>setPanel(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.meetingHeader}><Text style={[s.brand,{color:c.text}]}>{panel==='chat'?'Chat da reunião':'Participantes'}</Text><Button label="Fechar" icon="close-outline" onPress={()=>setPanel(null)}/></View>
       {panel==='chat'?<><ScrollView contentContainerStyle={s.section} keyboardShouldPersistTaps="handled">{messages.length===0&&<Text style={{color:c.muted}}>As mensagens aparecem aqui durante a reunião.</Text>}{messages.map(m=><View key={m.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.accent,fontWeight:'700'}}>{m.name}</Text><Text selectable style={{color:c.text}}>{m.text}</Text></View>)}</ScrollView><View style={s.composer}><TextInput accessibilityLabel="Mensagem" placeholder="Escreva uma mensagem" placeholderTextColor={c.muted} value={draft} onChangeText={setDraft} maxLength={500} style={[s.input,{color:c.text,borderColor:c.border,flex:1}]} onSubmitEditing={()=>void act(send)}/><Button label="Enviar" icon="send-outline" disabled={busy||!draft.trim()||!connected} onPress={()=>void act(send)}/></View></>:<ScrollView contentContainerStyle={s.section}>
         {auth.host&&<><Text style={[s.subtitle,{color:c.text}]}>Aguardando para entrar ({pending.length})</Text>{pending.map(p=><View key={p.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.text}}>{p.name}</Text><View style={s.row}><Button label="Aceitar" icon="checkmark-outline" disabled={busy} onPress={()=>void act(()=>decide(p.id,'admit'))}/><Button label="Recusar" icon="close-outline" disabled={busy} onPress={()=>void act(()=>decide(p.id,'deny'))}/></View></View>)}</>}

@@ -3,7 +3,7 @@
 module.exports=async({main,BrowserWindow,clipboard})=>{
  const assert=require('node:assert/strict');
  await main.webContents.executeJavaScript("window.meetDesktop.copyInvite('test-ci-123')");
- assert.equal(clipboard.readText(),'https://kpnc-meet.pages.dev/?room=test-ci-123');clipboard.clear();
+ assert.equal(await clipboard.readText(),'https://kpnc-meet.pages.dev/?room=test-ci-123');await clipboard.clear();
  const promise=main.webContents.executeJavaScript(`navigator.mediaDevices.getDisplayMedia({video:true,audio:true}).then(stream=>{const result={video:stream.getVideoTracks().map(t=>({state:t.readyState,display:t.getSettings().displaySurface})),audio:stream.getAudioTracks().length};stream.getTracks().forEach(t=>t.stop());return result}).catch(e=>({error:e.name,message:e.message}))`,true);
  let selected=false;
  const timer=setInterval(async()=>{const picker=BrowserWindow.getAllWindows().find(w=>/picker\.html$/.test(w.webContents.getURL()));if(!picker||selected)return;try{const ready=await picker.webContents.executeJavaScript("!!document.querySelector('#sources button')");if(ready){selected=true;await picker.webContents.executeJavaScript("document.querySelector('#sources button').click()");}}catch{}},250);

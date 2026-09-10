@@ -2,7 +2,7 @@
   "expo": {
     "name": "Kpnc Meet",
     "slug": "kpnc-meet",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "scheme": "kpncmeet",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "dev.kpnc.meet",
+      "versionCode": 2,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",

@@ -1,0 +1,40 @@
+'use strict';
+const {isMeetURL}=require('./policy.cjs');
+function checkPermission(permission,details,grants){
+  if(['fullscreen','display-capture','speaker-selection'].includes(permission))return true;
+  if(permission!=='media')return false;
+  return details.mediaType==='unknown'?(grants.has('audio')&&grants.has('video')):grants.has(details.mediaType);
+}
+function setupPermissions({ses,getMain,BrowserWindow,ipcMain,path}){
+  const grants=new Set();let active=null;
+  const trusted=(wc,url,details)=>!!getMain()&&!getMain().isDestroyed()&&wc===getMain().webContents&&isMeetURL(url)&&details.isMainFrame!==false;
+  function finish(allow=false){
+    const current=active;if(!current)return;active=null;clearTimeout(current.timer);
+    const permitted=allow&&!current.wc.isDestroyed()&&trusted(current.wc,current.wc.getURL(),current.details);
+    if(permitted)current.types.forEach(type=>grants.add(type));
+    if(!current.window.isDestroyed())current.window.close();
+    current.callback(permitted);
+  }
+  ipcMain.handle('permission:details',event=>{
+    if(!active||event.sender!==active.window.webContents||event.senderFrame!==active.window.webContents.mainFrame)throw new Error('Forbidden');
+    return active.types;
+  });
+  ipcMain.on('permission:answer',(event,allow)=>{
+    if(active&&event.sender===active.window.webContents&&event.senderFrame===active.window.webContents.mainFrame)finish(allow===true);
+  });
+  ses.setPermissionCheckHandler((wc,p,url,d)=>trusted(wc,url,d)&&checkPermission(p,d,grants));
+  ses.setPermissionRequestHandler((wc,p,callback,d)=>{
+    if(!trusted(wc,d.requestingUrl,d))return callback(false);
+    if(['fullscreen','display-capture','speaker-selection'].includes(p))return callback(true);
+    const types=d.mediaTypes||[];
+    if(p!=='media'||!types.length||types.some(t=>!['audio','video'].includes(t)))return callback(false);
+    if(types.every(t=>grants.has(t)))return callback(true);
+    if(active)return callback(false);
+    const window=new BrowserWindow({parent:getMain(),modal:true,width:480,height:365,resizable:false,title:'Kpnc Meet — Dispositivos',backgroundColor:'#101722',icon:path.join(__dirname,'assets/icon.ico'),webPreferences:{preload:path.join(__dirname,'permission-preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+    window.setMenu(null);active={window,wc,types,details:d,callback,timer:setTimeout(()=>finish(),60000)};
+    window.webContents.setWindowOpenHandler(()=>({action:'deny'}));window.webContents.on('will-navigate',e=>e.preventDefault());
+    window.on('closed',()=>finish());void window.loadFile(path.join(__dirname,'permission.html')).catch(()=>finish());
+  });
+  return {cancel:()=>finish()};
+}
+module.exports={setupPermissions,checkPermission};

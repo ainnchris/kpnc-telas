@@ -1,0 +1,3 @@
+.profile-image-container{position:relative;overflow:hidden;flex-shrink:0}.profile-image-container>img{position:absolute;left:50%;top:50%;max-width:none!important;max-height:none!important;object-fit:fill;pointer-events:none}
+.profile-editor{display:grid;gap:8px}.profile-editor label{font-size:12px;display:grid;gap:3px}.profile-editor input[type=range]{padding:0;width:100%}.profile-editor button{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink)}
+#profile-dialog{max-height:90vh;overflow:auto}#profile-dialog .profile-preview{width:140px;height:140px}#profile-hint{line-height:1.4}

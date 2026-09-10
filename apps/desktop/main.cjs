@@ -8,7 +8,7 @@ if (!app.isPackaged && process.argv.includes('--smoke-test')) {
   app.setPath('userData',profile);
 }
 let main, picker, pendingCapture;
-const mediaGrants = new Set();
+let permissions;
 const startupLink = process.argv.map(meetingLink).find(Boolean) || SITE;
 function trusted(contents, url) {
   return !!main && !main.isDestroyed() && contents === main.webContents && isMeetURL(url);
@@ -54,26 +54,11 @@ async function createWindow() {
   const smokeTest = !app.isPackaged && process.argv.includes('--smoke-test');
   main = new BrowserWindow({show:!smokeTest,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/icon.ico'),
     webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:'persist:kpnc-meet'}});
+  require('./updater.cjs').setupUpdater({app,ipcMain,getMain:()=>main,shell});
   const ses = session.fromPartition('persist:kpnc-meet');
-  ses.setPermissionCheckHandler((wc, permission, origin, details) => {
-    if (!trusted(wc, origin) || details.isMainFrame === false) return false;
-    if (permission === 'fullscreen') return true;
-    return permission === 'media' && mediaGrants.has(details.mediaType);
-  });
-  ses.setPermissionRequestHandler(async (wc, permission, callback, details) => {
-    if (!trusted(wc, details.requestingUrl) || details.isMainFrame === false) return callback(false);
-    if (permission === 'fullscreen') return callback(true);
-    if (permission !== 'media') return callback(false);
-    const types = details.mediaTypes || [];
-    if (!types.length || types.some(t => !['audio','video'].includes(t))) return callback(false);
-    if (types.every(t => mediaGrants.has(t))) return callback(true);
-    const answer = await dialog.showMessageBox(main,{type:'question',title:'Permissão de dispositivos',message:`Permitir acesso a ${types.map(t=>t==='audio'?'microfone':'câmera').join(' e ')}?`,detail:'A permissão vale enquanto o programa estiver aberto. Você controla os dispositivos nos botões da reunião.',buttons:['Não permitir','Permitir'],defaultId:0,cancelId:0});
-    const approved = answer.response === 1 && trusted(wc,wc.getURL());
-    if (approved) types.forEach(t => mediaGrants.add(t));
-    callback(approved);
-  });
+  permissions=require('./permissions.cjs').setupPermissions({ses,getMain:()=>main,BrowserWindow,ipcMain,path});
   ses.setDisplayMediaRequestHandler(chooseScreen);
-  main.webContents.on('will-navigate',(event,url) => {if (!isMeetURL(url)) event.preventDefault(); finishCapture();});
+  main.webContents.on('will-navigate',(event,url) => {if (!isMeetURL(url)) event.preventDefault(); permissions?.cancel(); finishCapture();});
   main.webContents.on('will-redirect',(event,url) => {if (!isMeetURL(url)) event.preventDefault();});
   main.webContents.on('will-attach-webview',event => event.preventDefault());
   main.webContents.setWindowOpenHandler(({url}) => {
@@ -86,7 +71,7 @@ async function createWindow() {
     const choice = await dialog.showMessageBox(main,{type:'warning',message:'Não foi possível abrir o Kpnc Meet.',detail:'Confira a internet e tente novamente.',buttons:['Tentar novamente','Fechar'],defaultId:0});
     if (choice.response === 0) void main.loadURL(SITE).catch(()=>{}); else main.close();
   });
-  main.on('closed',()=>{finishCapture();main=null;});
+  main.on('closed',()=>{permissions?.cancel();finishCapture();main=null;});
   Menu.setApplicationMenu(null);
   main.setMenu(null);
   main.webContents.on('before-input-event', (event, input) => {

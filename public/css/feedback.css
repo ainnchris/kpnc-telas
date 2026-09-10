@@ -1,3 +1,4 @@
 #toast{width:max-content;max-width:min(360px,calc(100vw - 32px));min-width:0;padding:9px 14px;font-size:13px;line-height:1.4;border-radius:12px;box-sizing:border-box;pointer-events:none;overflow-wrap:anywhere;background:#eef2f8;color:#111722}
 #device-status{font-size:13px;line-height:1.5;color:var(--muted)}
 #identify-devices{font-size:13px;padding:8px 12px}
+.update-notice{position:fixed;z-index:90;right:20px;bottom:20px;max-width:min(360px,calc(100vw - 40px));padding:20px;background:var(--surface,#fff);color:var(--ink,#142033);border:1px solid var(--line,#ddd);border-radius:16px;box-shadow:0 10px 40px #0003}.update-notice p,.update-notice small{font-size:13px;line-height:1.5}.update-notice small{display:block;margin-top:8px}.update-notice button{padding:9px 12px;margin-right:8px;border-radius:8px;cursor:pointer}

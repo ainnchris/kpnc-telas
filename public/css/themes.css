@@ -1,0 +1,15 @@
+body[data-theme=light]{--page:#f5f7fb;--surface:#fff;--tile:#344256;--ink:#142033;--muted:#5d6c80;--line:#d9e0e9;--soft:#e9eef5;--navy:#142033;--white:#fff;color-scheme:light}
+body[data-theme=dark]{--page:#0e1623;--surface:#172235;--tile:#22324a;--ink:#edf3ff;--muted:#adbbd0;--line:#34435a;--soft:#223149;--navy:#edf3ff;--white:#172235;color-scheme:dark}
+body[data-theme=gray]{--page:#292d33;--surface:#373c44;--tile:#444c57;--ink:#f4f5f7;--muted:#c2c8d0;--line:#5b626d;--soft:#464d58;--navy:#f4f5f7;--white:#373c44;color-scheme:dark}
+body[data-theme=black]{--page:#000;--surface:#090909;--tile:#111;--ink:#f5f5f5;--muted:#b8b8b8;--line:#303030;--soft:#191919;--navy:#f5f5f5;--white:#090909;color-scheme:dark}
+body[data-theme],body[data-theme] .home,body[data-theme] .topbar,body[data-theme] .preview,body[data-theme] .waiting,body[data-theme] .meeting{background:var(--page);color:var(--ink);border-color:var(--line)}
+body[data-theme] .hero h1,body[data-theme] .logo,body[data-theme] .meeting-info,body[data-theme] .preview-form{color:var(--ink);background:transparent}
+body[data-theme] .panel,body[data-theme] .more-menu,body[data-theme] dialog,body[data-theme] .waiting section{background:var(--surface);color:var(--ink);border-color:var(--line)}
+body[data-theme] input,body[data-theme] select,body[data-theme] .code-box{background:var(--surface);color:var(--ink);border-color:var(--line)}
+body[data-theme] .tile{background:var(--tile);border-color:var(--line)}
+body[data-theme] .tile .name{color:#fff}
+body[data-theme] .control:not(.danger):not(.off),body[data-theme] .actions button,body[data-theme] .message,body[data-theme] .person-actions button{background:var(--soft);color:var(--ink)}
+body[data-theme] .more-menu button,body[data-theme] .panel-tabs button,body[data-theme] .theme-picker{color:var(--ink)}
+.theme-picker{display:flex;align-items:center;gap:7px;font-size:13px;padding:8px}.theme-picker svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8}.theme-picker select{border:1px solid var(--line);border-radius:8px;padding:5px;max-width:120px}
+.audio-unlock{position:absolute;z-index:15;top:60px;left:50%;transform:translateX(-50%)}
+@media(max-width:520px){.top-actions{gap:4px}.top-actions .theme-picker{padding:0}.top-actions .theme-picker svg{display:none}.top-actions .theme-picker select{max-width:80px;font-size:11px}.top-actions .clock{display:none}.topbar{padding:12px}.logo strong{font-size:19px}.top-actions .theme-button{width:32px;height:32px}}

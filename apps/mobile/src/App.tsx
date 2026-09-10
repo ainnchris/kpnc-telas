@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, findNodeHandle, Image, Linking, Modal, NativeModules, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View} from 'react-native';
+import {Alert, AppState, findNodeHandle, Image, Linking, Modal, NativeModules, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View} from 'react-native';
 import {MediaStream as NativeMediaStream, RTCView, ScreenCapturePickerView} from '@livekit/react-native-webrtc';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Ionicons} from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import {AudioSession, LiveKitRoom, VideoTrack, isTrackReference, useRoomContext,
 import {createLocalVideoTrack, LocalVideoTrack, Participant, RoomEvent, Track} from 'livekit-client';
 import {api, ApiError, Auth, JoinRequest, Pending, post, Profile, roomCode, WEBSITE} from './api';
 
+const APP_VERSION='0.2.0';
 type Glyph = React.ComponentProps<typeof Ionicons>['name'];
 type Message = {id:string;name:string;text:string};
 const dark={bg:'#080c12',surface:'#131c2b',text:'#f2f5fc',muted:'#a7b4ca',border:'#29384e',accent:'#438dff'};
@@ -24,13 +25,14 @@ function Avatar({profile,size=84}:{profile:Profile;size?:number}) {
   return profile.avatar ? <Image source={{uri:profile.avatar}} style={{width:size,height:size,borderRadius:size/2}}/> : <View style={[s.avatar,{width:size,height:size,borderRadius:size/2}]}><Text style={{fontSize:size*.4,color:'white',fontWeight:'700'}}>{profile.name.charAt(0).toUpperCase()||'K'}</Text></View>;
 }
 function participantProfile(p:Participant):Profile {
-  let avatar=''; try{const data=JSON.parse(p.metadata||'{}');if(typeof data.avatar==='string' && /^data:image\/(png|jpeg|webp);base64,/.test(data.avatar) && data.avatar.length<=12000)avatar=data.avatar}catch{}
+  let avatar=''; try{const data=JSON.parse(p.metadata||'{}');data.avatar=data.avatarPoster||data.avatar;if(typeof data.avatar==='string' && /^data:image\/(png|jpeg|webp);base64,/.test(data.avatar) && data.avatar.length<=12000)avatar=data.avatar}catch{}
   return {name:p.name||'Participante',avatar};
 }
 function errorMessage(error:unknown){return error instanceof Error?error.message:'Não foi possível concluir. Tente novamente.'}
 
 export default function App() {
   const [profile,setProfile]=useState<Profile>({name:'',avatar:''});
+  const [availableUpdate,setAvailableUpdate]=useState<{version:string;url:string}|null>(null);
   const [loaded,setLoaded]=useState(false),[darkMode,setDarkMode]=useState(true);
   const [screen,setScreen]=useState<'home'|'preview'|'waiting'|'meeting'>('home');
   const [mode,setMode]=useState<'create'|'join'>('create'),[code,setCode]=useState('');
@@ -42,6 +44,17 @@ export default function App() {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const operation=useRef(0);
   const c=darkMode?dark:light;
+  useEffect(()=>{
+    if(screen!=='home'||Platform.OS!=='android')return;
+    let active=true;
+    const check=async()=>{try{const response=await fetch(WEBSITE+'/updates.json');if(!response.ok)return;const data=await response.json(),u=data.android;
+      if(!u||typeof u.version!=='string'||!/^\d+\.\d+\.\d+$/.test(u.version)||typeof u.url!=='string')return;
+      const target=new URL(u.url),a=u.version.split('.').map(Number),b=APP_VERSION.split('.').map(Number),index=a.findIndex((n:number,i:number)=>n!==b[i]);
+      if(active&&index>=0&&a[index]>b[index]&&target.protocol==='https:'&&target.hostname==='github.com'&&target.pathname.startsWith('/ainnchris/kpnc-telas/releases/download/')&&target.pathname.endsWith('.apk'))setAvailableUpdate(u);
+    }catch{}};
+    void check();const timer=setInterval(check,120000),listener=AppState.addEventListener('change',value=>{if(value==='active')void check()});
+    return()=>{active=false;clearInterval(timer);listener.remove()};
+  },[screen]);
   useEffect(()=>{void SystemUI.setBackgroundColorAsync(c.bg).catch(()=>{})},[c.bg]);
   useEffect(()=>{
     if(screen!=='preview'||!camera)return;
@@ -119,6 +132,7 @@ export default function App() {
       <View style={s.header}><Text style={[s.brand,{color:c.text}]}>Kpnc <Text style={{color:c.accent}}>Meet</Text></Text><Button label={darkMode?'Tema claro':'Tema escuro'} icon={darkMode?'sunny-outline':'moon-outline'} onPress={()=>setDarkMode(!darkMode)}/></View>
       {screen==='waiting' ? <View style={s.section}><Ionicons name="hourglass-outline" size={54} color={c.accent}/><Text style={[s.title,{color:c.text}]}>Aguardando o anfitrião</Text><Text style={{color:c.muted}}>Sua solicitação foi enviada. Você entrará quando ela for aceita.</Text><Text style={{color:c.muted}}>{request?.room}</Text><Button label="Cancelar" icon="close-outline" onPress={reset}/></View> : <>
       {screen==='preview'&&<Button label="Voltar" icon="arrow-back-outline" onPress={reset} disabled={busy}/>}
+      {screen==='home'&&availableUpdate&&<View style={[s.section,{backgroundColor:c.surface,padding:16,borderRadius:12}]}><Text style={{color:c.text}}>Nova versão {availableUpdate.version} disponível</Text><Text style={{color:c.muted}}>O Android pedirá confirmação para instalar. Nenhuma reunião será interrompida.</Text><Button label="Baixar atualização" icon="download-outline" onPress={()=>{void Linking.openURL(availableUpdate.url).catch(()=>setError('Não foi possível abrir o download.'))}}/><Button label="Depois" icon="time-outline" onPress={()=>setAvailableUpdate(null)}/></View>}
       <Text style={[s.title,{color:c.text}]}>{screen==='home'?'Conversas que aproximam.':'Como você quer entrar?'}</Text>
       {screen==='preview'&&!!previewURL&&<RTCView streamURL={previewURL} objectFit="cover" mirror style={{width:'100%',height:240,borderRadius:20}}/>}
       <View style={[s.profile,{backgroundColor:c.surface,borderColor:c.border}]}><Avatar profile={profile}/><View style={s.row}><Button label="Foto" icon="image-outline" onPress={choosePhoto}/>{!!profile.avatar&&<Button label="Remover" icon="trash-outline" onPress={()=>setProfile(p=>({...p,avatar:''}))}/>}</View><TextInput accessibilityLabel="Seu nome" placeholder="Seu nome" placeholderTextColor={c.muted} maxLength={48} value={profile.name} onChangeText={name=>setProfile(p=>({...p,name}))} style={[s.input,{color:c.text,borderColor:c.border}]}/><Text style={{color:c.muted}}>Seu perfil fica salvo neste aparelho.</Text></View>

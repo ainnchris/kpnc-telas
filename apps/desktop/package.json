@@ -1,6 +1,6 @@
 {
   "name": "kpnc-meet-desktop",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Kpnc Meet para Windows",
   "author": "Kpnc",
@@ -10,7 +10,7 @@
   "build": {
     "appId":"dev.kpnc.meet", "productName":"Kpnc Meet",
     "directories":{"output":"dist"},
-    "files":["*.cjs", "picker.html", "picker.css", "picker.js", "assets/**"],
+    "files":["*.cjs", "picker.html", "picker.css", "picker.js", "permission.html", "permission.css", "permission.js", "assets/**"],
     "asar":true,
     "win":{"target":"nsis","icon":"assets/icon.ico"},
     "nsis":{"installerIcon":"assets/icon.ico","uninstallerIcon":"assets/icon.ico","oneClick":false,"perMachine":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true},

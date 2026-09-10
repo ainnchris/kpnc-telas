@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   ios-simulator:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
     env:
@@ -37,6 +38,8 @@ jobs:
           path: apps/mobile/Kpnc-Meet-simulator.zip
           if-no-files-found: error
   windows:
+    permissions:
+      contents: write
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
@@ -49,6 +52,7 @@ jobs:
           version: '11.19.0'
       - run: pnpm install --frozen-lockfile
       - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs
+      - run: node --test scripts/test-sounds.cjs
       - run: pnpm --filter kpnc-meet-mobile typecheck
       - run: pnpm --filter kpnc-meet-desktop dist
         env:
@@ -58,7 +62,13 @@ jobs:
           name: Kpnc-Meet-Windows-experimental
           path: apps/desktop/dist/*.exe
           if-no-files-found: error
+      - name: Publicar atualizacao Windows verificada
+        run: node scripts/publish-build.cjs windows
+        env:
+          GH_TOKEN: ${{ github.token }}
   android:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -86,3 +96,7 @@ jobs:
           name: Kpnc-Meet-Android-experimental
           path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+      - name: Publicar atualizacao Android
+        run: node scripts/publish-build.cjs android
+        env:
+          GH_TOKEN: ${{ github.token }}

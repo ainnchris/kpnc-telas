@@ -13,14 +13,14 @@
       patterns[name].forEach((frequency,index)=>{
         const osc=context.createOscillator(),gain=context.createGain(),start=context.currentTime+index*.105,duration=name==='click'?.035:.10;
         osc.type='sine';osc.frequency.value=frequency;
-        gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(name==='click'?.018:.055,start+.008);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+        gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(name==='click'?.03:.09,start+.008);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
         osc.connect(gain);gain.connect(context.destination);osc.start(start);osc.stop(start+duration+.01);osc.onended=()=>{osc.disconnect();gain.disconnect();};
       });
     }catch{/* Sound must never block a meeting action. */}
   }
   const button=document.createElement('button');button.type='button';button.id='sounds-toggle';
   const homeButton=document.createElement('button');homeButton.type='button';homeButton.id='home-sounds-toggle';homeButton.className='theme-button';document.querySelector('.top-actions').prepend(homeButton);
-  function sync(){const label='Sons de interação: '+(enabled?'ligados':'desligados'),glyph='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="'+(enabled?'M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14':'m16 9 5 6m0-6-5 6')+'"/></svg>';button.setAttribute('aria-pressed',String(enabled));button.innerHTML=glyph+'<span>'+label+'</span>';homeButton.innerHTML=glyph;homeButton.title=label;homeButton.setAttribute('aria-label',label);homeButton.setAttribute('aria-pressed',String(enabled));}
+  function sync(){const label='Sons de interação: '+(enabled?'ligados':'desligados'),glyph='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="'+(enabled?'M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14':'m16 9 5 6m0-6-5 6')+'"/></svg>';button.setAttribute('aria-pressed',String(enabled));button.innerHTML=glyph+'<span>'+label+'</span>';homeButton.innerHTML=glyph+'<span>'+label+'</span>';homeButton.title=label;homeButton.setAttribute('aria-label',label);homeButton.setAttribute('aria-pressed',String(enabled));}
   button.onclick=homeButton.onclick=()=>{enabled=!enabled;localStorage.setItem('kpnc-sounds',enabled?'on':'off');sync();if(enabled)play('click');};
   document.querySelector('#more-menu').append(button);sync();
   document.addEventListener('click',event=>{const target=event.target.closest?.('button');if(target&&!target.disabled&&target!==button&&target!==homeButton)play('click');},true);

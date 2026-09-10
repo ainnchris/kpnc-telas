@@ -2,7 +2,7 @@
   "expo": {
     "name": "Kpnc Meet",
     "slug": "kpnc-meet",
-    "version": "0.2.0",
+    "version": "0.4.0",
     "scheme": "kpncmeet",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
@@ -19,7 +19,8 @@
     },
     "android": {
       "package": "dev.kpnc.meet",
-      "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
+      "versionCode": 4,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -50,8 +51,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Escolha uma foto para seu perfil no Kpnc Meet.",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": "Ative sua câmera para participar das reuniões.",
+          "microphonePermission": "Ative seu microfone para conversar nas reuniões."
         }
       ],
       "./plugins/with-broadcast"

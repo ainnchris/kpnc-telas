@@ -73,7 +73,7 @@ jobs:
           version: '11.19.0'
       - run: pnpm install --frozen-lockfile
       - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs
-      - run: node --test scripts/test-sounds.cjs
+      - run: node --test scripts/test-sounds.cjs scripts/test-media-start.cjs
       - run: pnpm --filter kpnc-meet-mobile typecheck
       - run: node apps/desktop/node_modules/electron/install.js
       - name: Verificar captura real e clipboard antes de publicar
@@ -82,6 +82,10 @@ jobs:
       - run: pnpm --filter kpnc-meet-desktop dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verificar atualizacao silenciosa e reabertura
+        timeout-minutes: 6
+        shell: pwsh
+        run: ./scripts/test-windows-upgrade.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: Kpnc-Meet-Windows-experimental
@@ -114,10 +118,18 @@ jobs:
       - run: pnpm --filter kpnc-meet-mobile typecheck
       - run: node node_modules/expo/bin/cli prebuild --platform android --no-install
         working-directory: apps/mobile
+      - run: node scripts/check-android-permissions.cjs apps/mobile/android/app/src/main/AndroidManifest.xml
       # Expo's generated release variant uses a debug signing key for preview only.
       # A production upload requires a user-owned release key / Play App Signing.
       - run: ./gradlew assembleRelease --no-daemon
         working-directory: apps/mobile/android
+      - name: Conferir permissoes dentro do APK
+        shell: bash
+        run: |
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$AAPT" dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk > apk-permissions.txt
+          grep -q "android.permission.CAMERA" apk-permissions.txt
+          grep -q "android.permission.RECORD_AUDIO" apk-permissions.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Kpnc-Meet-Android-experimental

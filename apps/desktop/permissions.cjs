@@ -22,8 +22,9 @@ function setupPermissions({ses,getMain,BrowserWindow,ipcMain,path}){
   ipcMain.on('permission:answer',(event,allow)=>{
     if(active&&event.sender===active.window.webContents&&event.senderFrame===active.window.webContents.mainFrame)finish(allow===true);
   });
-  ses.setPermissionCheckHandler((wc,p,url,d)=>trusted(wc,url,d)&&checkPermission(p,d,grants));
+  ses.setPermissionCheckHandler((wc,p,url,d)=>{const allowed=trusted(wc,url,d)&&checkPermission(p,d,grants);console.info('MEET_PERMISSION_CHECK',JSON.stringify({permission:p,mediaType:d.mediaType,mainFrame:d.isMainFrame,allowed}));return allowed;});
   ses.setPermissionRequestHandler((wc,p,callback,d)=>{
+    console.info('MEET_PERMISSION_REQUEST',JSON.stringify({permission:p,mediaTypes:d.mediaTypes,mainFrame:d.isMainFrame,trusted:trusted(wc,d.requestingUrl,d)}));
     if(!trusted(wc,d.requestingUrl,d))return callback(false);
     if(['fullscreen','display-capture','speaker-selection'].includes(p))return callback(true);
     const types=d.mediaTypes||[];

@@ -1,8 +1,8 @@
 'use strict';
-const {app, BrowserWindow, Menu, session, dialog, desktopCapturer, ipcMain, shell} = require('electron');
+const {app, BrowserWindow, Menu, session, dialog, desktopCapturer, ipcMain, shell, clipboard} = require('electron');
 const path = require('node:path');
 const {SITE, isMeetURL, meetingLink} = require('./policy.cjs');
-if (!app.isPackaged && process.argv.includes('--smoke-test')) {
+if (!app.isPackaged && (process.argv.includes('--smoke-test') || process.argv.includes('--media-smoke'))) {
   const profile = path.join(__dirname,'dist','smoke-profile');
   require('node:fs').mkdirSync(profile,{recursive:true});
   app.setPath('userData',profile);
@@ -25,7 +25,10 @@ function finishCapture(result = {}) {
   }
 }
 async function chooseScreen(request, callback) {
-  if (!main || request.frame !== main.webContents.mainFrame || !isMeetURL(request.securityOrigin) || !request.userGesture || pendingCapture) return callback({});
+  const validFrame=!!main&&request.frame===main.webContents.mainFrame;
+  console.info('MEET_CAPTURE_REQUEST',JSON.stringify({validFrame,trustedOrigin:isMeetURL(request.securityOrigin),userGesture:request.userGesture,busy:!!pendingCapture}));
+  // The explicit local picker is the consent boundary, even after async SDK work.
+  if (!validFrame || !isMeetURL(request.securityOrigin) || pendingCapture) return callback({});
   const pending = {callback, sources:[], timer:setTimeout(() => finishCapture(), 60000), audio:request.audioRequested};
   pendingCapture = pending;
   try {
@@ -36,8 +39,9 @@ async function chooseScreen(request, callback) {
     picker.webContents.setWindowOpenHandler(() => ({action:'deny'}));
     picker.webContents.on('will-navigate', e => e.preventDefault());
     picker.on('closed', () => {picker = null; finishCapture();});
-    await picker.loadFile('picker.html');
-  } catch { finishCapture(); }
+    await picker.loadFile(path.join(__dirname,'picker.html'));
+    console.info('MEET_CAPTURE_PICKER_READY',pending.sources.length);
+  } catch (error) {console.warn('MEET_CAPTURE_FAILED',error?.name||'Error');finishCapture();}
 }
 ipcMain.handle('capture:list', event => {
   if (!picker || event.sender !== picker.webContents || event.senderFrame !== picker.webContents.mainFrame || !pendingCapture) throw new Error('Forbidden');
@@ -52,9 +56,11 @@ ipcMain.on('capture:select', (event, selection) => {
 function sendAction(id) { if (main && !main.isDestroyed() && isMeetURL(main.webContents.getURL())) main.webContents.send('meet:action',id); }
 async function createWindow() {
   const smokeTest = !app.isPackaged && process.argv.includes('--smoke-test');
-  main = new BrowserWindow({show:!smokeTest,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/icon.ico'),
+  main = new BrowserWindow({show:!smokeTest,frame:false,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/icon.ico'),
     webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:'persist:kpnc-meet'}});
   require('./updater.cjs').setupUpdater({app,ipcMain,getMain:()=>main,shell});
+  require('./window-controls.cjs').setupWindowControls({ipcMain,getMain:()=>main,clipboard});
+  for(const event of ['maximize','unmaximize','enter-full-screen','leave-full-screen'])main.on(event,()=>main.webContents.send('meet:window-state',{maximized:main.isMaximized(),fullscreen:main.isFullScreen()}));
   const ses = session.fromPartition('persist:kpnc-meet');
   permissions=require('./permissions.cjs').setupPermissions({ses,getMain:()=>main,BrowserWindow,ipcMain,path});
   ses.setDisplayMediaRequestHandler(chooseScreen);
@@ -62,7 +68,8 @@ async function createWindow() {
   main.webContents.on('will-redirect',(event,url) => {if (!isMeetURL(url)) event.preventDefault();});
   main.webContents.on('will-attach-webview',event => event.preventDefault());
   main.webContents.setWindowOpenHandler(({url}) => {
-    if (isMeetURL(url)) void shell.openExternal(url);
+    const target=require('./window-controls.cjs').externalURL(url);
+    if (target) void shell.openExternal(target);
     return {action:'deny'};
   });
   main.webContents.on('did-fail-load',async (_event,code,_description,_url,isMainFrame) => {
@@ -82,6 +89,9 @@ async function createWindow() {
     if (key === 'f11') {event.preventDefault();main.setFullScreen(!main.isFullScreen());}
   });
   await main.loadURL(startupLink).catch(()=>{});
+  if (!app.isPackaged && process.argv.includes('--media-smoke')) {
+    try{await require('./smoke-media.cjs')({main,BrowserWindow,clipboard});app.exit(0);}catch(error){console.error('MEDIA_SMOKE_FAILED',error);app.exit(1);}return;
+  }
   if (smokeTest) {
     const result = await main.webContents.executeJavaScript(`({title:document.title,home:!!document.getElementById('new-meeting'),livekit:!!window.LivekitClient,nodeExposed:typeof require!=='undefined',chatButton:!!document.getElementById('chat-toggle')})`);
     console.log(JSON.stringify(result));

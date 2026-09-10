@@ -23,3 +23,6 @@ jobs:
       - name: Abrir site em janela oculta com sandbox e sem acesso aos dispositivos
         timeout-minutes: 3
         run: node apps/desktop/node_modules/electron/cli.js apps/desktop --smoke-test
+      - name: Testar clipboard e captura com escolha de fonte no desktop descartavel do CI
+        timeout-minutes: 2
+        run: node apps/desktop/node_modules/electron/cli.js apps/desktop --media-smoke

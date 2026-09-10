@@ -10,6 +10,27 @@ concurrency:
   group: apps-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      mobile: ${{ steps.paths.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$MANUAL" = "true" ]; then
+            echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BEFORE" HEAD | grep -Eq '^(apps/mobile/|pnpm-lock.yaml|pnpm-workspace.yaml)'; then
+            echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'mobile=false' >> "$GITHUB_OUTPUT"
+          fi
   ios-simulator:
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
@@ -54,6 +75,10 @@ jobs:
       - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs
       - run: node --test scripts/test-sounds.cjs
       - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: node apps/desktop/node_modules/electron/install.js
+      - name: Verificar captura real e clipboard antes de publicar
+        timeout-minutes: 2
+        run: node apps/desktop/node_modules/electron/cli.js apps/desktop --media-smoke
       - run: pnpm --filter kpnc-meet-desktop dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -67,6 +92,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
   android:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
     permissions:
       contents: write
     runs-on: ubuntu-latest

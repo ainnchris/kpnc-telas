@@ -23,3 +23,7 @@ Backups estáveis permanecem intocados. GIFs grandes/R2 e publicação iPhone co
 O job Windows da execução 34533441426 passou em captura real, clipboard e instalação silenciosa de 0.3.0 para 0.4.0, verificando a versão instalada e a reabertura automática. SHA-256 do EXE publicado: `825d48f4f9497c807be5c58d6aa5a00be681837edfd7d0efaed02a22d3abe40f`.
 
 Web 2026-09-10.4 também respeita “Depois” durante o download: a instalação automática é cancelada e não interrompe uma reunião.
+
+## Evidência de publicação Android
+
+A mesma execução 34533441426 compilou o APK 0.4.0 com sucesso e verificou CAMERA/RECORD_AUDIO dentro do APK com aapt. SHA-256: `08400879e0a286b4657eb69271b3cb11b23ec32e398a09a38f1878caf146553e`. Os dois instaladores foram baixados e seus hashes conferidos localmente. Isso não equivale a um teste de chamada em aparelho físico.

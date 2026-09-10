@@ -17,3 +17,9 @@ Testes locais: 21 testes de unidade, TypeScript mobile, manifesto Android gerado
 Não validado em aparelho Android físico nesta sessão; confirmar câmera/microfone, teclado e retorno da tela cheia no aparelho do usuário. A alteração de inicialização do PC remove um bloqueio possível por saída de áudio, mas não substitui esse teste de hardware.
 
 Backups estáveis permanecem intocados. GIFs grandes/R2 e publicação iPhone continuam adiados.
+
+## Evidência de publicação Windows
+
+O job Windows da execução 34533441426 passou em captura real, clipboard e instalação silenciosa de 0.3.0 para 0.4.0, verificando a versão instalada e a reabertura automática. SHA-256 do EXE publicado: `825d48f4f9497c807be5c58d6aa5a00be681837edfd7d0efaed02a22d3abe40f`.
+
+Web 2026-09-10.4 também respeita “Depois” durante o download: a instalação automática é cancelada e não interrompe uma reunião.

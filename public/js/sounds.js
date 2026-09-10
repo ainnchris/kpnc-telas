@@ -20,7 +20,7 @@
   }
   const button=document.createElement('button');button.type='button';button.id='sounds-toggle';
   const homeButton=document.createElement('button');homeButton.type='button';homeButton.id='home-sounds-toggle';homeButton.className='theme-button';document.querySelector('.top-actions').prepend(homeButton);
-  function sync(){const label='Sons de interação: '+(enabled?'ligados':'desligados'),glyph='<svg aria-hidden="true"><use href="#i-'+(enabled?'volume-high':'volume-off')+'"/></svg>';button.setAttribute('aria-pressed',String(enabled));button.innerHTML=glyph+'<span>'+label+'</span>';homeButton.innerHTML=glyph+'<span>'+label+'</span>';homeButton.title=label;homeButton.setAttribute('aria-label',label);homeButton.setAttribute('aria-pressed',String(enabled));}
+  function sync(){const label='Sons de interação: '+(enabled?'ligados':'desligados'),glyph='<svg aria-hidden="true"><use href="#i-'+(enabled?'volume-high':'volume-off')+'"/></svg>';button.setAttribute('aria-pressed',String(enabled));button.title=label;button.setAttribute('aria-label',label);const compact='Sons: '+(enabled?'ligados':'desligados');button.innerHTML=glyph+'<span>'+compact+'</span>';homeButton.innerHTML=glyph+'<span>'+compact+'</span>';homeButton.title=label;homeButton.setAttribute('aria-label',label);homeButton.setAttribute('aria-pressed',String(enabled));}
   button.onclick=homeButton.onclick=()=>{enabled=!enabled;localStorage.setItem('kpnc-sounds',enabled?'on':'off');sync();if(enabled)play('click');};
   document.querySelector('#more-menu').append(button);sync();
   document.addEventListener('click',event=>{const target=event.target.closest?.('button');if(target&&!target.disabled&&target!==button&&target!==homeButton)play('click');},true);

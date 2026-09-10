@@ -1,5 +1,5 @@
 (() => {
- const version='2026-09-10.4';let manifest,dismissed='',checking=false,ready=false,downloading=false,autoInstall=false,installing=false;
+ const version='2026-09-10.5';let manifest,dismissed='',checking=false,ready=false,downloading=false,autoInstall=false,installing=false;
  const busy=()=>['preview','waiting','meeting'].some(id=>!document.getElementById(id).classList.contains('hidden'))||!!document.querySelector('dialog[open]');
  const bar=document.createElement('aside');bar.className='update-notice hidden';bar.setAttribute('role','status');bar.innerHTML='<strong>Uma nova versão está disponível</strong><p>Atualize agora ou continue e faça isso depois.</p><button class="primary" id="apply-update">Atualizar agora</button><button id="later-update">Depois</button><small id="update-message"></small>';document.body.append(bar);
  const message=bar.querySelector('small'),progress=document.createElement('progress');progress.max=100;progress.hidden=true;progress.setAttribute('aria-label','Progresso da atualização');bar.append(progress);

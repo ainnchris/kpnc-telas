@@ -28,6 +28,10 @@ function setupPermissions({ses,getMain,BrowserWindow,ipcMain,path}){
     if(!trusted(wc,d.requestingUrl,d))return callback(false);
     if(['fullscreen','display-capture','speaker-selection'].includes(p))return callback(true);
     const types=d.mediaTypes||[];
+    // Electron 44 reports getDisplayMedia as media with an empty mediaTypes list.
+    // Allow it to reach setDisplayMediaRequestHandler and its explicit source picker.
+    // This does not grant microphone/camera permission or select a capture source.
+    if(p==='media'&&Array.isArray(d.mediaTypes)&&types.length===0)return callback(true);
     if(p!=='media'||!types.length||types.some(t=>!['audio','video'].includes(t)))return callback(false);
     if(types.every(t=>grants.has(t)))return callback(true);
     if(active)return callback(false);

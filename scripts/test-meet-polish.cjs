@@ -48,6 +48,12 @@ const root=path.resolve(__dirname,'..');
  assert.equal(await page.locator('.message a').count(),1);assert.equal(await page.locator('.message a').getAttribute('href'),'https://example.org/path?a=1');assert.equal(await page.locator('.message img').count(),0);
  await page.locator('#copy-link').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Link copiado.'||!!document.querySelector('.invite-fallback'));if(await page.locator('.invite-fallback').count()){assert.match(await page.locator('.invite-fallback input').inputValue(),/room=abc-def-123$/);await page.locator('.invite-fallback button').click();}
  await page.screenshot({path:path.join(root,'work','meeting-polish-new.png')});assert.deepEqual(errors,[]);
+ await page.addInitScript(()=>{window.windowActions=[];window.meetDesktop={checkUpdate:async()=>({available:false}),copyInvite:async code=>{window.copiedRoom=code},windowAction:async action=>{window.windowActions.push(action);return {maximized:action==='maximize',fullscreen:false}},onWindowState:callback=>{window.testWindowState=callback}}});
+ await page.evaluate(()=>window.testHooks.state.room=null);await page.reload();assert.equal(await page.locator('#desktop-titlebar').count(),1);assert.equal(await page.locator('#download-card').count(),0);
+ await page.locator('.top-actions .settings-open').click();
+ const barColors=[];for(const theme of ['light','dark','gray','black']){await page.locator('#general-settings select').selectOption(theme);barColors.push(await page.locator('#desktop-titlebar').evaluate(n=>getComputedStyle(n).backgroundColor));}assert.equal(new Set(barColors).size,4);
+ await page.locator('#settings-dialog header button').click();await page.locator('[data-window=maximize]').click();await page.locator('[data-window=minimize]').click();assert.deepEqual(await page.evaluate(()=>windowActions),['state','maximize','minimize']);
+ await page.evaluate(()=>testWindowState({fullscreen:true}));assert(await page.locator('#desktop-titlebar').isHidden());await page.evaluate(()=>testWindowState({fullscreen:false}));assert(await page.locator('#desktop-titlebar').isVisible());assert.deepEqual(errors,[]);
  console.log('PASS: downloads, settings, input themes, crop drag/zoom/rotate, presets, responsive avatar, speaker frame, host crown, isolated presentation volume, emoji, safe links, clipboard fallback, stable tiles');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

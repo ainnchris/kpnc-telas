@@ -17,6 +17,12 @@ const root=path.resolve(__dirname,'..');
  await page.goto('https://kpnc-meet.pages.dev');
  await page.locator('#download-card a').first().waitFor();assert.equal(await page.locator('#download-card a').count(),2);assert.equal(await page.locator('#clock').count(),0);assert.equal(await page.locator('#profile-open svg').count(),0);
  await page.locator('.top-actions .settings-open').click();await page.locator('#general-settings select').selectOption('dark');
+ for(const width of [320,1280]){
+  await page.setViewportSize({width,height:900});
+  const geometry=await page.locator('#general-settings').evaluate(n=>{const box=s=>n.querySelector(s).getBoundingClientRect();const icon=box('svg'),select=box('select'),sound=box('#home-sounds-toggle');return {aligned:Math.abs(icon.y+icon.height/2-select.y-select.height/2)<2,height:sound.height,overflow:n.scrollWidth>n.clientWidth};});
+  assert(geometry.aligned,'theme icon must sit beside select');assert.equal(geometry.height,48);assert.equal(geometry.overflow,false);
+ }
+ await page.screenshot({path:path.join(root,'work','settings-aligned.png')});
  assert.equal(await page.locator('#room-code').evaluate(n=>getComputedStyle(n).backgroundColor),'rgba(0, 0, 0, 0)');
  await page.locator('#settings-dialog header button').click();await page.locator('#profile-open').click();
  await page.locator('.avatar-presets summary').click();assert.equal(await page.locator('#avatar-presets button').count(),16);await page.locator('#avatar-presets button').nth(3).click();await page.locator('#profile-name').fill('Teste anfitrião');
@@ -38,6 +44,15 @@ const root=path.resolve(__dirname,'..');
  });
  assert.equal(await page.locator('.share-volume').count(),2);assert.equal(await page.locator('.host-badge').count(),1);
  assert.equal(await page.locator('.tile.speaking').evaluate(n=>getComputedStyle(n).borderTopColor),'rgb(50, 213, 131)');
+ await page.locator('#more-toggle').click();await page.locator('#more-menu select').selectOption('light');
+ await page.locator('#sounds-toggle').click();
+ assert.equal(await page.locator('#sounds-toggle').innerText(),'Sons: desligados');
+ assert(await page.locator('#sounds-toggle span').evaluate(n=>n.getBoundingClientRect().height<25));
+ await page.evaluate(()=>{const tile=document.createElement('article');tile.className='tile';tile.id='test-avatar-tile';tile.innerHTML='<div class="avatar">T</div><span class="name">Teste</span>';document.querySelector('#grid').append(tile)});
+ assert.equal(await page.locator('#test-avatar-tile').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(255, 255, 255)');
+ assert.equal(await page.locator('#test-avatar-tile .name').evaluate(n=>getComputedStyle(n).color),'rgb(20, 32, 51)');
+ await page.screenshot({path:path.join(root,'work','light-meeting-corrected.png')});
+ await page.evaluate(()=>document.querySelector('#test-avatar-tile').remove());await page.locator('#more-toggle').click();
  await page.locator('[data-key^="guest-a:"] .share-volume input').fill('35');
  assert.deepEqual(await page.evaluate(()=>volumeCalls.at(-1)),{id:'guest-a',source:'screen_share_audio',value:.35});
  await page.locator('[data-key^="guest-a:"] .share-volume button').click();assert.equal(await page.evaluate(()=>volumeCalls.at(-1).value),0);

@@ -11,6 +11,7 @@ on:
     branches:
       - main
     paths:
+      - .github/workflows/deploy-worker.yml
       - worker/**
       - package.json
       - pnpm-lock.yaml
@@ -31,7 +32,7 @@ jobs:
       - name: Checkout deployment source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_ref || github.ref }}
+          ref: audit/seguranca-readme-2026-09
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

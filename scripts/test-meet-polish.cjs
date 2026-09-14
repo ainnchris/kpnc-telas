@@ -11,7 +11,7 @@ const root=path.resolve(__dirname,'..');
   if(url.hostname!=='kpnc-meet.pages.dev')return route.abort();
   if(url.pathname==='/updates.json')return route.fulfill({json:{web:'2026-09-10.2',windows:{url:'https://github.com/ainnchris/kpnc-telas/releases/download/windows-0.2.0/Kpnc-Meet-Setup-0.2.0.exe'},android:{url:'https://github.com/ainnchris/kpnc-telas/releases/download/android-0.2.0/Kpnc-Meet-0.2.0.apk'}}});
   const relative=url.pathname==='/'?'index.html':url.pathname.slice(1),file=path.resolve(root,'public',relative);if(!file.startsWith(path.resolve(root,'public')+path.sep))return route.abort();
-  if(relative==='js/app.js')return route.fulfill({body:fs.readFileSync(file,'utf8').replace(/\}\)\(\);\s*$/,'window.testHooks={state,renderAll,onTrack,offTrack,message,leave,updateSpeakerHighlights};})();'),contentType:'text/javascript'});
+  if(relative==='js/app.js')return route.fulfill({body:fs.readFileSync(file,'utf8').replace(/\}\)\(\);\s*$/,'window.testHooks={state,renderAll,onTrack,offTrack,message,receive,leave,updateSpeakerHighlights};})();'),contentType:'text/javascript'});
   return route.fulfill({path:file,contentType:relative.endsWith('.js')?'text/javascript':relative.endsWith('.css')?'text/css':relative.endsWith('.html')?'text/html':undefined});
  });
  await page.goto('https://kpnc-meet.pages.dev');
@@ -62,6 +62,10 @@ const root=path.resolve(__dirname,'..');
  await page.evaluate(()=>window.testHooks.message({name:'Teste',text:'Olá 😀 https://example.org/path?a=1. <img src=x onerror=alert(1)> javascript:alert(1) https://user:pass@example.org'}));
  assert.equal(await page.locator('.message a').count(),1);assert.equal(await page.locator('.message a').getAttribute('href'),'https://example.org/path?a=1');assert.equal(await page.locator('.message img').count(),0);
  await page.locator('#copy-link').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Link copiado.'||!!document.querySelector('.invite-fallback'));if(await page.locator('.invite-fallback').count()){assert.match(await page.locator('.invite-fallback input').inputValue(),/room=abc-def-123$/);await page.locator('.invite-fallback button').click();}
+ await page.evaluate(()=>{const payload=new TextEncoder().encode(JSON.stringify({action:'end'}));window.testHooks.receive(payload,{identity:'guest-malicious',name:'Convidado'},null,'room-control')});
+ assert(await page.evaluate(()=>window.testHooks.state.room!==null),'guest must not be able to end the meeting');
+ await page.evaluate(()=>{const payload=new TextEncoder().encode(JSON.stringify({action:'end'}));window.testHooks.receive(payload,{identity:'host-authorized',name:'Anfitrião'},null,'room-control')});
+ assert.equal(await page.evaluate(()=>window.testHooks.state.room),null);
  await page.screenshot({path:path.join(root,'work','meeting-polish-new.png')});assert.deepEqual(errors,[]);
  await page.addInitScript(()=>{window.windowActions=[];window.meetDesktop={checkUpdate:async()=>({available:false}),copyInvite:async code=>{window.copiedRoom=code},windowAction:async action=>{window.windowActions.push(action);return {maximized:action==='maximize',fullscreen:false}},onWindowState:callback=>{window.testWindowState=callback}}});
  await page.evaluate(()=>window.testHooks.state.room=null);await page.reload();assert.equal(await page.locator('#desktop-titlebar').count(),1);assert.equal(await page.locator('#download-card').count(),0);
@@ -69,6 +73,6 @@ const root=path.resolve(__dirname,'..');
  const barColors=[];for(const theme of ['light','dark','gray','black']){await page.locator('#general-settings select').selectOption(theme);barColors.push(await page.locator('#desktop-titlebar').evaluate(n=>getComputedStyle(n).backgroundColor));}assert.equal(new Set(barColors).size,4);
  await page.locator('#settings-dialog header button').click();await page.locator('[data-window=maximize]').click();await page.locator('[data-window=minimize]').click();assert.deepEqual(await page.evaluate(()=>windowActions),['state','maximize','minimize']);
  await page.evaluate(()=>testWindowState({fullscreen:true}));assert(await page.locator('#desktop-titlebar').isHidden());await page.evaluate(()=>testWindowState({fullscreen:false}));assert(await page.locator('#desktop-titlebar').isVisible());assert.deepEqual(errors,[]);
- console.log('PASS: downloads, settings, input themes, crop drag/zoom/rotate, presets, responsive avatar, speaker frame, host crown, isolated presentation volume, emoji, safe links, clipboard fallback, stable tiles');
+ console.log('PASS: downloads, settings, themes, profile, speaker frame, host-only room control, safe links, clipboard fallback and stable tiles');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

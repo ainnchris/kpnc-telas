@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const encoder = new TextEncoder();
 const MAX_BODY_BYTES = 16 * 1024;
+const MAX_REQUESTS_PER_ROOM = 50;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000;
 const REQUEST_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_ORIGINS = ['https://kpnc-meet.pages.dev', 'http://localhost:3000', 'http://localhost:8788'];
@@ -22,11 +23,12 @@ export class RoomCoordinator extends DurableObject<Env> {
     const room = await this.ctx.storage.get<RoomState>('room');
     return !!room && !room.closed && Date.now() - room.createdAt < ROOM_TTL_MS;
   }
-  async requestJoin(request: JoinRequest): Promise<'created' | 'missing'> {
+  async requestJoin(request: JoinRequest): Promise<'created' | 'missing' | 'full'> {
     const room = await this.ctx.storage.get<RoomState>('room');
     if (!room || room.closed || Date.now() - room.createdAt >= ROOM_TTL_MS) return 'missing';
-    room.requests[request.id] = request;
     this.prune(room);
+    if (Object.keys(room.requests).length >= MAX_REQUESTS_PER_ROOM) return 'full';
+    room.requests[request.id] = request;
     await this.ctx.storage.put('room', room);
     return 'created';
   }
@@ -105,7 +107,7 @@ async function signedToken(env: Env, payload: Record<string, unknown>): Promise<
 }
 async function issueToken(env: Env, room: string, name: string, host: boolean, avatar = ''): Promise<string> {
   const now = Math.floor(Date.now() / 1000); const identity = `${host ? 'host' : 'guest'}-${crypto.randomUUID()}`;
-  return signedToken(env, { exp: now + 6 * 60 * 60, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name, metadata: JSON.stringify({ host, avatar }), video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true, roomAdmin: host } });
+  return signedToken(env, { exp: now + 6 * 60 * 60, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name, metadata: JSON.stringify({ host, avatar }), video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } });
 }
 async function roomService(env: Env, room: string, method: 'RemoveParticipant' | 'MutePublishedTrack', body: Record<string, unknown>): Promise<void> {
   const now = Math.floor(Date.now() / 1000); const token = await signedToken(env, { exp: now + 300, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: `kpnc-admin-${crypto.randomUUID()}`, video: { roomAdmin: true, room } });
@@ -138,11 +140,15 @@ export default {
         const id = crypto.randomUUID(); const secret = randomToken();
         const result = await coordinator(env, room).requestJoin({ id, name, avatar, secretHash: await sha256(secret), status: 'waiting', createdAt: Date.now() });
         if (result === 'missing') return json({ error: 'Esta reunião não existe ou já foi encerrada.', code: 'ROOM_NOT_FOUND' }, 404, origin);
+        if (result === 'full') return json({ error: 'A sala de espera está cheia. Tente novamente em alguns minutos.', code: 'WAITING_ROOM_FULL' }, 429, origin);
         return json({ room, requestId: id, requestSecret: secret, status: 'waiting' }, 202, origin);
       }
       const statusMatch = url.pathname.match(/^\/api\/join-requests\/([0-9a-f-]+)$/i);
       if (request.method === 'GET' && statusMatch) {
-        const room = clean(url.searchParams.get('room'), 64).toLowerCase(); const secret = clean(url.searchParams.get('secret'), 128);
+        const room = clean(url.searchParams.get('room'), 64).toLowerCase();
+        // Keep query-string compatibility for already installed 0.4.0 clients.
+        // New clients use Authorization so the secret is not exposed in URLs.
+        const secret = clean(bearer(request), 128) || clean(url.searchParams.get('secret'), 128);
         const status = await coordinator(env, room).requestStatus(statusMatch[1], await sha256(secret));
         if (!status) return json({ error: 'Solicitação expirada ou reunião encerrada.', code: 'REQUEST_EXPIRED' }, 404, origin);
         if (status.status !== 'approved') return json({ status: status.status }, 200, origin);

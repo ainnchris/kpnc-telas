@@ -1,58 +1,47 @@
-LICENÇA PROPRIETÁRIA — TODOS OS DIREITOS RESERVADOS
+# LICENÇA PROPRIETÁRIA — TODOS OS DIREITOS RESERVADOS
 
-Kpnc Telas
+**Kpnc Meet**
 Copyright (c) 2026 Jp Dev's. Todos os direitos reservados.
 
-Este software, incluindo mas não se limitando ao código-fonte, design de
-interface, identidade visual, textos, estrutura e documentação (doravante
-"o Software"), é de propriedade exclusiva de Jp Dev's ("o Autor").
+Esta licença se aplica ao código-fonte autoral, ao design de interface, à identidade visual, aos textos e à documentação do Kpnc Meet, em conjunto denominados **Software**. O Software é propriedade exclusiva de Jp Dev's (**Autor**), exceto pelos componentes de terceiros identificados na Seção 3.
 
-1. PROIBIÇÕES
+## 1. Uso autorizado
 
-Salvo autorização prévia e por escrito do Autor, é expressamente proibido:
+O acesso ao Software não concede licença de uso, cópia, modificação ou distribuição. O Software somente pode ser utilizado por pessoas expressamente autorizadas pelo Autor e para as finalidades definidas nessa autorização.
 
-  a) Copiar, reproduzir ou duplicar o Software, total ou parcialmente;
-  b) Redistribuir, publicar, sublicenciar ou disponibilizar o Software
-     a terceiros, por qualquer meio;
-  c) Modificar, adaptar, traduzir ou criar obras derivadas a partir
-     do Software;
-  d) Utilizar o Software, ou qualquer parte dele, para fins comerciais;
-  e) Fazer engenharia reversa, descompilar ou desofuscar o Software,
-     exceto nos limites em que isso seja expressamente permitido por
-     lei aplicável, independentemente desta restrição;
-  f) Remover, ocultar ou alterar avisos de direitos autorais, marca
-     ("Kpnc Telas") ou créditos de autoria ("Jp Dev's") presentes no
-     Software.
+Nenhuma permissão adicional, expressa ou implícita, é concedida pela disponibilização do repositório, de uma cópia do código ou de um instalador.
 
-2. USO AUTORIZADO
+## 2. Proibições
 
-O acesso ao Software é concedido apenas a pessoas expressamente
-autorizadas pelo Autor, exclusivamente para os fins por ele definidos.
-Nenhuma outra permissão, expressa ou implícita, é concedida por meio
-desta licença.
+Sem autorização prévia e escrita do Autor, é proibido:
 
-3. AUSÊNCIA DE GARANTIAS
+1. copiar, reproduzir ou duplicar o Software, total ou parcialmente;
+2. redistribuir, publicar, vender, sublicenciar ou disponibilizar o Software a terceiros;
+3. modificar, adaptar, traduzir ou criar obras derivadas;
+4. utilizar o Software ou parte dele para fins comerciais;
+5. remover ou alterar avisos de direitos autorais, a marca Kpnc Meet ou os créditos de autoria;
+6. realizar engenharia reversa, descompilar ou desofuscar o Software, salvo quando a legislação aplicável não permitir essa restrição.
 
-O SOFTWARE É FORNECIDO "COMO ESTÁ", SEM GARANTIAS DE QUALQUER TIPO,
-EXPRESSAS OU IMPLÍCITAS, INCLUINDO, MAS NÃO SE LIMITANDO A, GARANTIAS
-DE COMERCIALIZAÇÃO, ADEQUAÇÃO A UM PROPÓSITO ESPECÍFICO OU NÃO
-VIOLAÇÃO. EM NENHUMA HIPÓTESE O AUTOR SERÁ RESPONSÁVEL POR QUALQUER
-DANO DECORRENTE DO USO OU DA IMPOSSIBILIDADE DE USO DO SOFTWARE.
+## 3. Componentes de terceiros
 
-4. VIOLAÇÕES
+Esta licença não substitui nem restringe as licenças dos componentes de terceiros utilizados pelo projeto. Dependências, SDKs, bibliotecas, ícones e trechos acompanhados de licença própria permanecem sujeitos aos termos de seus respectivos titulares.
 
-O uso não autorizado do Software constitui violação de direitos
-autorais e poderá sujeitar o infrator às medidas legais cabíveis,
-nos termos da Lei nº 9.610/1998 (Lei de Direitos Autorais) e da
-Lei nº 9.609/1998 (Lei de Software), sem prejuízo de outras
-providências cíveis e criminais aplicáveis.
+Os avisos distribuídos em `public/licenses/`, nos arquivos de dependências e junto aos componentes incorporados fazem parte da documentação de licenças do projeto.
 
-5. CONTATO
+## 4. Ausência de garantias
 
-Para solicitar autorização de uso, licenciamento comercial ou
-esclarecer dúvidas sobre esta licença, entre em contato diretamente
-com o Autor, Jp Dev's.
+O SOFTWARE É FORNECIDO **“COMO ESTÁ”**, SEM GARANTIAS DE QUALQUER TIPO, EXPRESSAS OU IMPLÍCITAS, INCLUINDO GARANTIAS DE COMERCIALIZAÇÃO, ADEQUAÇÃO A UMA FINALIDADE ESPECÍFICA E NÃO VIOLAÇÃO.
+
+NA MÁXIMA EXTENSÃO PERMITIDA PELA LEGISLAÇÃO, O AUTOR NÃO SERÁ RESPONSÁVEL POR DANOS, PERDAS, INTERRUPÇÕES OU RECLAMAÇÕES DECORRENTES DO USO OU DA IMPOSSIBILIDADE DE USO DO SOFTWARE.
+
+## 5. Violações
+
+O uso não autorizado poderá constituir violação de direitos autorais e de direitos sobre software, sujeitando o responsável às medidas cabíveis, inclusive nos termos da Lei nº 9.610/1998 e da Lei nº 9.609/1998, sem prejuízo de outras normas aplicáveis.
+
+## 6. Autorizações e contato
+
+Solicitações de uso, colaboração ou licenciamento comercial devem ser encaminhadas diretamente ao Autor, Jp Dev's.
 
 ---
 
-Kpnc Telas é uma marca de Jp Dev's.
+Kpnc Meet é uma marca de Jp Dev's.

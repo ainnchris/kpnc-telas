@@ -94,7 +94,7 @@ function App() {
     let active=true;let timer:ReturnType<typeof setTimeout>;const controller=new AbortController();
     const poll=async()=>{
       try {
-        const result=await api<Auth&{status:string}>(`/api/join-requests/${request.requestId}?room=${encodeURIComponent(request.room)}&secret=${encodeURIComponent(request.requestSecret)}`,{signal:controller.signal});
+        const result=await api<Auth&{status:string}>(`/api/join-requests/${request.requestId}?room=${encodeURIComponent(request.room)}`,{headers:{Authorization:`Bearer ${request.requestSecret}`},signal:controller.signal});
         if(!active)return;
         if(result.status==='denied'){setError('O anfitrião recusou sua entrada.');reset();return}
         if(result.status==='approved'){await AudioSession.startAudioSession();if(!active){void AudioSession.stopAudioSession();return}setAuth(result);setScreen('meeting');return}

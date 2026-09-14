@@ -24,6 +24,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - suporte de código a atualizações rápidas Expo, ainda aguardando vinculação do projeto EAS;
 - coanfitriões com credenciais próprias e revogáveis, transferência de anfitrião e permissões individuais de microfone, câmera, chat e compartilhamento;
 - chat com histórico limitado à duração da sala, respostas por referência, links seguros, avisos acessíveis e emojis categorizados também no aplicativo móvel.
+- serviço Android de chamada em primeiro plano, com áudio preservado ao apagar a tela e notificação permanente para silenciar o microfone, alternar a saída, voltar ao aplicativo ou encerrar a reunião.
 
 ## Próximas etapas
 
@@ -43,7 +44,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 ### Aplicativos
 
-- Android em segundo plano, incluindo áudio com a tela apagada e notificação permanente com controles;
+- validar em aparelhos Android reais o áudio em segundo plano, tela apagada e os controles da notificação permanente;
 - ativar o projeto/canal EAS para atualizações rápidas da interface;
 - configurar e preservar uma chave Android definitiva. Ao trocar a assinatura experimental atual pela definitiva, poderá ser necessária uma última reinstalação; depois disso, as atualizações poderão substituir o mesmo aplicativo;
 - completar e validar o atualizador do Windows com instalador assinado, retomada, progresso e recuperação de falhas;

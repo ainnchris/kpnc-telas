@@ -41,7 +41,10 @@
         "MODIFY_AUDIO_SETTINGS",
         "BLUETOOTH_CONNECT",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "FOREGROUND_SERVICE_MEDIA_PROJECTION",
+        "POST_NOTIFICATIONS",
         "REQUEST_INSTALL_PACKAGES"
       ]
     },
@@ -70,7 +73,8 @@
           "microphonePermission": "Ative seu microfone para conversar nas reuniões."
         }
       ],
-      "./plugins/with-broadcast"
+      "./plugins/with-broadcast",
+      "./plugins/with-call-service"
     ]
   }
 }

@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, AppState, findNodeHandle, Image, Linking, Modal, NativeModules, Platform, Pressable, KeyboardAvoidingView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions} from 'react-native';
+import {Alert, AppState, findNodeHandle, Image, Linking, Modal, NativeEventEmitter, NativeModules, PermissionsAndroid, Platform, Pressable, KeyboardAvoidingView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import {AVATAR_PRESETS} from './avatar-presets';
 import {MediaStream as NativeMediaStream, RTCView, ScreenCapturePickerView} from '@livekit/react-native-webrtc';
@@ -277,6 +277,9 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   const [facing,setFacing]=useState<'user'|'environment'>('user');
   const screenCaptureRef=useRef<React.ElementRef<typeof ScreenCapturePickerView>>(null);
   const [audioOutputs,setAudioOutputs]=useState<string[]|null>(null);
+  const [speakerOn,setSpeakerOn]=useState(true);
+  const permissionsRef=useRef(permissions),speakerOnRef=useRef(speakerOn),notificationActionBusy=useRef(false);
+  permissionsRef.current=permissions;speakerOnRef.current=speakerOn;
   const panelRef=useRef(panel);panelRef.current=panel;
   const connected=connection==='connected';
   const participants=[room.localParticipant,...Array.from(room.remoteParticipants.values())];
@@ -336,6 +339,54 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
     void poll();return()=>{active=false;controller.abort();clearTimeout(timer)};
   },[auth.room,memberKey,addMessage]);
   useEffect(()=>{
+    if(Platform.OS!=='android'||!connected||!NativeModules.KpncCall)return;
+    const call=NativeModules.KpncCall;
+    let active=true;
+    const start=async()=>{
+      if(Number(Platform.Version)>=33){
+        const permission=PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
+        if(permission&&!(await PermissionsAndroid.check(permission))){
+          const result=await PermissionsAndroid.request(permission,{title:'Controles da reunião',message:'Permita notificações para manter a chamada ativa e controlar o microfone quando o Kpnc Meet estiver em segundo plano.',buttonPositive:'Permitir',buttonNegative:'Agora não'});
+          if(result!==PermissionsAndroid.RESULTS.GRANTED&&active)setError('As notificações estão desativadas. A chamada pode continuar, mas os controles não aparecerão fora do aplicativo.');
+        }
+      }
+      if(active)call.start(auth.room,room.localParticipant.isMicrophoneEnabled,speakerOnRef.current);
+    };
+    void start().catch(error=>{if(active)setError(errorMessage(error))});
+    const subscription=new NativeEventEmitter(call).addListener('KpncCallAction',(action:string)=>{
+      if(notificationActionBusy.current)return;
+      notificationActionBusy.current=true;
+      void (async()=>{
+        try{
+          if(action==='leave'){
+            call.stop();
+            await room.disconnect();
+            onLeave();
+            return;
+          }
+          if(action==='toggleMic'){
+            if(!permissionsRef.current.microphone)throw new Error('O anfitrião bloqueou seu microfone.');
+            await room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled,{echoCancellation:true,noiseSuppression:true,autoGainControl:true});
+            call.update(room.localParticipant.isMicrophoneEnabled,speakerOnRef.current);
+          }
+          if(action==='toggleSpeaker'){
+            const outputs=await AudioSession.getAudioOutputs();
+            const nextSpeaker=!speakerOnRef.current;
+            const target=nextSpeaker?(outputs.includes('speaker')?'speaker':undefined):(outputs.includes('earpiece')?'earpiece':outputs.find(output=>output!=='speaker'));
+            if(!target)throw new Error('Não há outra saída de áudio disponível neste aparelho.');
+            await AudioSession.selectAudioOutput(target);
+            speakerOnRef.current=nextSpeaker;setSpeakerOn(nextSpeaker);
+            call.update(room.localParticipant.isMicrophoneEnabled,nextSpeaker);
+          }
+        }catch(error){setError(errorMessage(error))}finally{notificationActionBusy.current=false}
+      })();
+    });
+    return()=>{active=false;subscription.remove();call.stop()};
+  },[auth.room,connected,onLeave,room]);
+  useEffect(()=>{
+    if(Platform.OS==='android'&&connected&&NativeModules.KpncCall)NativeModules.KpncCall.update(room.localParticipant.isMicrophoneEnabled,speakerOn);
+  },[connected,room.localParticipant.isMicrophoneEnabled,speakerOn]);
+  useEffect(()=>{
     if(!isAdmin||!adminKey)return;
     let active=true;let timer:ReturnType<typeof setTimeout>;const controller=new AbortController();
     const poll=async()=>{
@@ -381,7 +432,7 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
     const outputs=await AudioSession.getAudioOutputs();
     setAudioOutputs(outputs);
   }
-  const leave=()=>{void room.disconnect();onLeave()};
+  const leave=()=>{if(Platform.OS==='android')NativeModules.KpncCall?.stop();void room.disconnect();onLeave()};
   const end=()=>Alert.alert('Encerrar para todos?','Todos os participantes sairão da reunião.',[{text:'Cancelar',style:'cancel'},{text:'Encerrar',style:'destructive',onPress:()=>void act(async()=>{await api(`/api/rooms/${auth.room}/close`,post({},adminKey));leave()})}]);
   const visibleTracks=tracks.filter(isTrackReference);
   type Tile={key:string;participant:Participant;track:(typeof visibleTracks)[number]|null};
@@ -445,7 +496,7 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
       </View>
     </SafeAreaView></Modal>
     <Modal visible={emojiOpen} animationType="slide" onRequestClose={()=>setEmojiOpen(false)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.meetingHeader}><Text style={[s.brand,{color:c.text,flex:1}]}>Emojis</Text><Button label="Fechar" icon="close" onPress={()=>setEmojiOpen(false)}/></View><TextInput accessibilityLabel="Pesquisar emoji" placeholder="Pesquisar pelo símbolo" placeholderTextColor={c.muted} value={emojiSearch} onChangeText={setEmojiSearch} style={[s.input,{color:c.text,borderColor:c.border,margin:12,width:undefined}]}/><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.emojiCategories}>{(Object.keys(EMOJI_LABELS) as EmojiCategory[]).map(category=><Pressable key={category} accessibilityRole="button" accessibilityState={{selected:emojiCategory===category}} onPress={()=>setEmojiCategory(category)} style={[s.emojiCategory,{borderColor:emojiCategory===category?c.accent:c.border,backgroundColor:c.surface}]}><Text style={{color:c.text,fontWeight:'700'}}>{EMOJI_LABELS[category]}</Text></Pressable>)}</ScrollView><ScrollView contentContainerStyle={s.emojiGrid}>{emojiItems.length?emojiItems.map((emoji,index)=><Pressable key={emoji+'-'+index} accessibilityRole="button" accessibilityLabel={'Inserir '+emoji} onPress={()=>chooseEmoji(emoji)} style={[s.emojiCell,{backgroundColor:c.surface,borderColor:c.border}]}><Text style={{fontSize:29}}>{emoji}</Text></Pressable>):<Text style={{color:c.muted}}>Nenhum emoji encontrado nesta categoria.</Text>}</ScrollView></SafeAreaView></Modal>
-    <Modal visible={audioOutputs!==null} onRequestClose={()=>setAudioOutputs(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.section}><Text style={[s.title,{color:c.text}]}>Saída de áudio</Text>{audioOutputs?.map(output=><Button key={output} label={({speaker:'Alto-falante',earpiece:'Fone do aparelho',bluetooth:'Bluetooth',headset:'Fone de ouvido'} as Record<string,string>)[output]||output} icon="volume-high" disabled={busy} onPress={()=>void act(async()=>{await AudioSession.selectAudioOutput(output);setAudioOutputs(null)})}/>)}<Button label="Voltar" icon="arrow-back" onPress={()=>setAudioOutputs(null)}/></View></SafeAreaView></Modal>
+    <Modal visible={audioOutputs!==null} onRequestClose={()=>setAudioOutputs(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.section}><Text style={[s.title,{color:c.text}]}>Saída de áudio</Text>{audioOutputs?.map(output=><Button key={output} label={({speaker:'Alto-falante',earpiece:'Fone do aparelho',bluetooth:'Bluetooth',headset:'Fone de ouvido'} as Record<string,string>)[output]||output} icon="volume-high" disabled={busy} onPress={()=>void act(async()=>{await AudioSession.selectAudioOutput(output);const enabled=output==='speaker';speakerOnRef.current=enabled;setSpeakerOn(enabled);NativeModules.KpncCall?.update(room.localParticipant.isMicrophoneEnabled,enabled);setAudioOutputs(null)})}/>)}<Button label="Voltar" icon="arrow-back" onPress={()=>setAudioOutputs(null)}/></View></SafeAreaView></Modal>
     <Modal visible={panel!==null} animationType="slide" onRequestClose={()=>setPanel(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><KeyboardAvoidingView style={s.root} behavior={Platform.OS==='ios'?'padding':'height'}><View style={s.meetingHeader}><Text style={[s.brand,{color:c.text,flex:1}]}>{panel==='chat'?'Chat da reunião':'Participantes'}</Text><Button label="Fechar" icon="close" onPress={()=>setPanel(null)}/></View>
       {panel==='chat'?<><ScrollView contentContainerStyle={s.section} keyboardShouldPersistTaps="handled">{messages.length===0&&<Text style={{color:c.muted}}>As mensagens aparecem aqui durante a reunião.</Text>}{messages.map(messageBubble)}</ScrollView><View style={s.composerWrap}>{!!replyTo&&<View style={[s.replyPreview,{borderColor:c.accent}]}><Text numberOfLines={1} style={{color:c.muted,flex:1}}>Respondendo a {replyTo.name}: {replyTo.text}</Text><Pressable accessibilityRole="button" accessibilityLabel="Cancelar resposta" onPress={()=>setReplyTo(null)}><Ionicons name="close" color={c.muted} size={20}/></Pressable></View>}<View style={s.composer}><Pressable accessibilityRole="button" accessibilityLabel="Escolher emoji" onPress={()=>setEmojiOpen(true)} style={s.emojiButton}><Text style={{fontSize:24}}>☺</Text></Pressable><TextInput accessibilityLabel="Mensagem" placeholder={permissions.chat?'Escreva uma mensagem':'Chat bloqueado pelo anfitrião'} placeholderTextColor={c.muted} editable={permissions.chat} value={draft} onChangeText={setDraft} maxLength={500} style={[s.input,{color:c.text,borderColor:c.border,flex:1}]} onSubmitEditing={()=>void act(send)}/><Button label="Enviar" icon="send" disabled={busy||!draft.trim()||!connected||!permissions.chat} onPress={()=>void act(send)}/></View></View></>:<ScrollView contentContainerStyle={s.section}>
         {isAdmin&&<><Text style={[s.subtitle,{color:c.text}]}>Aguardando para entrar ({pending.length})</Text>{pending.map(p=><View key={p.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.text}}>{p.name}</Text><View style={s.row}><Button label="Aceitar" icon="checkmark" disabled={busy} onPress={()=>void act(()=>decide(p.id,'admit'))}/><Button label="Recusar" icon="close" disabled={busy} onPress={()=>void act(()=>decide(p.id,'deny'))}/></View></View>)}</>}

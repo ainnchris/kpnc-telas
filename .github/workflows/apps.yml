@@ -3,6 +3,9 @@ on:
   push:
     branches: [feat/meet-multiplataforma, feat/meet-next]
     paths: [apps/**, pnpm-lock.yaml, pnpm-workspace.yaml, .github/workflows/apps.yml]
+  pull_request:
+    branches: [main]
+    paths: [apps/**, pnpm-lock.yaml, pnpm-workspace.yaml, .github/workflows/apps.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,7 +24,7 @@ jobs:
       - id: paths
         shell: bash
         env:
-          BEFORE: ${{ github.event.before }}
+          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
           MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           if [ "$MANUAL" = "true" ]; then

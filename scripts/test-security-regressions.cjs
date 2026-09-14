@@ -19,6 +19,10 @@ assert(worker.includes('authorizeHost')&&worker.includes('authorizeAdmin'),'host
 assert(worker.includes("role: 'cohost'")&&worker.includes('secureEqual(member.secretHash, adminHash)'),'cohosts must use revocable hashed credentials');
 assert(worker.includes("'UpdateParticipant'")&&worker.includes('can_publish_sources')&&worker.includes('can_publish_data'),'individual media and chat permissions must be enforced by LiveKit');
 assert(worker.includes("'DeleteRoom'"),'ending a room must be enforced by the server instead of trusting a peer data message');
+assert(worker.includes('chatHistory(memberHash')&&worker.includes('this.member(room, memberHash)'),'chat history must require a room-member credential');
+assert(worker.includes("throw new Error('CHAT_BLOCKED')"),'server must enforce individual chat permission');
+assert(worker.includes('room.messages = room.messages.slice(-200)'),'room chat history must stay bounded');
+assert(web.includes('replyId:state.replyTo?.id')&&mobile.includes("replyId:replyTo?.id||''"),'replies must reference server-side message IDs');
 assert(web.includes('Transferir a função de anfitrião')&&mobile.includes('Transferir anfitrião'),'host transfer must require an explicit user action');
 assert(web.includes('state.memberKey')&&mobile.includes('memberKey=auth.memberKey'),'clients must poll their own role without sharing the original host key');
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');

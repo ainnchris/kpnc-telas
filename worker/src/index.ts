@@ -12,14 +12,15 @@ type MemberRole = 'participant' | 'cohost' | 'host';
 type MemberPermissions = { microphone: boolean; camera: boolean; chat: boolean; screen: boolean };
 type JoinRequest = { id: string; name: string; avatar: string; secretHash: string; status: JoinStatus; createdAt: number; identity?: string };
 type MemberState = { secretHash: string; role: Exclude<MemberRole, 'host'>; permissions: MemberPermissions };
-type RoomState = { hostHash: string; hostIdentity: string; createdAt: number; closed: boolean; locked: boolean; requests: Record<string, JoinRequest>; members: Record<string, MemberState> };
+type ChatMessage = { id: string; identity: string; name: string; text: string; replyTo?: { id: string; name: string; text: string }; createdAt: number };
+type RoomState = { hostHash: string; hostIdentity: string; createdAt: number; closed: boolean; locked: boolean; requests: Record<string, JoinRequest>; members: Record<string, MemberState>; messages: ChatMessage[] };
 const DEFAULT_PERMISSIONS: MemberPermissions = { microphone: true, camera: true, chat: true, screen: true };
 
 export class RoomCoordinator extends DurableObject<Env> {
   async create(hostHash: string, hostIdentity: string): Promise<boolean> {
     const current = await this.ctx.storage.get<RoomState>('room');
     if (current && !current.closed && Date.now() - current.createdAt < ROOM_TTL_MS) return false;
-    await this.ctx.storage.put('room', { hostHash, hostIdentity, createdAt: Date.now(), closed: false, locked: false, requests: {}, members: {} } satisfies RoomState);
+    await this.ctx.storage.put('room', { hostHash, hostIdentity, createdAt: Date.now(), closed: false, locked: false, requests: {}, members: {}, messages: [] } satisfies RoomState);
     await this.ctx.storage.setAlarm(Date.now() + ROOM_TTL_MS);
     return true;
   }
@@ -96,6 +97,17 @@ export class RoomCoordinator extends DurableObject<Env> {
     target.role = 'participant'; room.hostHash = target.secretHash; room.hostIdentity = identity;
     await this.ctx.storage.put('room', room);
   }
+  async chatHistory(memberHash: string): Promise<ChatMessage[]> {
+    const room = await this.getRoom(); this.normalize(room); this.member(room, memberHash); return room.messages.slice(-200);
+  }
+  async addMessage(memberHash: string, id: string, name: string, text: string, replyId: string): Promise<ChatMessage> {
+    const room = await this.getRoom(); this.normalize(room); const member = this.member(room, memberHash);
+    if (!member.permissions.chat) throw new Error('CHAT_BLOCKED');
+    const duplicate = room.messages.find((item) => item.id === id); if (duplicate) return duplicate;
+    const referenced = replyId ? room.messages.find((item) => item.id === replyId) : undefined;
+    const message: ChatMessage = { id, identity: member.identity, name, text, ...(referenced ? { replyTo: { id: referenced.id, name: referenced.name, text: referenced.text.slice(0, 120) } } : {}), createdAt: Date.now() };
+    room.messages.push(message); room.messages = room.messages.slice(-200); await this.ctx.storage.put('room', room); return message;
+  }
   async setPermissions(adminHash: string, identity: string, permissions: MemberPermissions): Promise<void> {
     const room = await this.authorizeAdmin(adminHash); this.normalize(room);
     if (identity === room.hostIdentity) throw new Error('HOST_PERMISSIONS');
@@ -107,6 +119,11 @@ export class RoomCoordinator extends DurableObject<Env> {
     const room = await this.ctx.storage.get<RoomState>('room');
     if (!room || room.closed) throw new Error('UNAUTHORIZED');
     return room;
+  }
+  private member(room: RoomState, memberHash: string): { identity: string; permissions: MemberPermissions } {
+    if (secureEqual(room.hostHash, memberHash)) return { identity: room.hostIdentity, permissions: { ...DEFAULT_PERMISSIONS } };
+    for (const [identity, member] of Object.entries(room.members)) if (secureEqual(member.secretHash, memberHash)) return { identity, permissions: member.permissions };
+    throw new Error('UNAUTHORIZED');
   }
   private async authorizeHost(hostHash: string): Promise<RoomState> {
     const room = await this.getRoom();
@@ -120,7 +137,7 @@ export class RoomCoordinator extends DurableObject<Env> {
     throw new Error('UNAUTHORIZED');
   }
   private async authorize(hostHash: string): Promise<RoomState> { return this.authorizeHost(hostHash); }
-  private normalize(room: RoomState): void { room.members ||= {}; room.hostIdentity ||= 'host-legacy'; }
+  private normalize(room: RoomState): void { room.members ||= {}; room.messages ||= []; room.hostIdentity ||= 'host-legacy'; }
   private prune(room: RoomState): void {
     const cutoff = Date.now() - REQUEST_TTL_MS;
     for (const [id, item] of Object.entries(room.requests)) if (item.createdAt < cutoff) delete room.requests[id];
@@ -211,6 +228,13 @@ export default {
         if (status.status !== 'approved') return json({ status: status.status }, 200, origin);
         return json({ status: 'approved', token: await issueToken(env, room, status.name, false, status.avatar, status.identity), url: env.LIVEKIT_URL, room, host: false, memberKey: secret }, 200, origin);
       }
+      const messagesMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/messages$/i);
+      if (request.method === 'GET' && messagesMatch) return json({ messages: await coordinator(env, messagesMatch[1]).chatHistory(await sha256(bearer(request))) }, 200, origin);
+      if (request.method === 'POST' && messagesMatch) {
+        const body = await readBody(request); const id = clean(body.id, 80); const name = clean(body.name, 48); const text = clean(body.text, 500); const replyId = clean(body.replyId, 80);
+        if (!/^[a-z0-9-]{8,80}$/i.test(id) || name.length < 1 || text.length < 1) return json({ error: 'Mensagem inválida.' }, 400, origin);
+        return json({ message: await coordinator(env, messagesMatch[1]).addMessage(await sha256(bearer(request)), id, name, text, replyId) }, 201, origin);
+      }
       const roleMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/role$/i);
       if (request.method === 'GET' && roleMatch) return json(await coordinator(env, roleMatch[1]).roleStatus(await sha256(bearer(request))), 200, origin);
       const roleChangeMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/participants\/([^/]+)\/role$/i);
@@ -262,6 +286,7 @@ export default {
       if (message === 'HOST_REQUIRED') return json({ error: 'Ação permitida apenas ao anfitrião principal.' }, 403, origin);
       if (message === 'MEMBER_NOT_FOUND') return json({ error: 'Participante não encontrado ou ainda não autenticado.' }, 404, origin);
       if (message === 'HOST_PERMISSIONS') return json({ error: 'As permissões do anfitrião principal não podem ser limitadas.' }, 409, origin);
+      if (message === 'CHAT_BLOCKED') return json({ error: 'O chat foi bloqueado para você pelo anfitrião.' }, 403, origin);
       return json({ error: message === 'BODY_TOO_LARGE' ? 'Requisição muito grande.' : 'Não foi possível processar a solicitação.' }, 400, origin);
     }
   }

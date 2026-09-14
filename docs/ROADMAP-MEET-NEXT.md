@@ -22,7 +22,8 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - ícones normal, adaptativo e monocromático do Android;
 - download e verificação SHA-256 da atualização Android dentro do aplicativo, mantendo a confirmação de instalação exigida pelo sistema;
 - suporte de código a atualizações rápidas Expo, ainda aguardando vinculação do projeto EAS;
-- coanfitriões com credenciais próprias e revogáveis, transferência de anfitrião e permissões individuais de microfone, câmera, chat e compartilhamento.
+- coanfitriões com credenciais próprias e revogáveis, transferência de anfitrião e permissões individuais de microfone, câmera, chat e compartilhamento;
+- chat com histórico limitado à duração da sala, respostas por referência, links seguros, avisos acessíveis e emojis categorizados também no aplicativo móvel.
 
 ## Próximas etapas
 
@@ -30,7 +31,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 - validar coanfitrião, transferência e permissões em chamadas reais entre navegador, Windows e Android;
 - completar confirmações, histórico e estados visuais para todas as ações administrativas;
-- revisar o histórico e os avisos do chat, links, respostas e acessibilidade.
+- validar histórico, respostas, links, avisos e acessibilidade do chat em chamadas reais.
 
 ### Experiência de apresentação
 

@@ -48,3 +48,14 @@ test('immersive mobile viewer keeps fullscreen, zoom, landscape and chat modes t
  assert.match(source,/viewerMode==='chat'/);
  assert.match(source,/statusBarTranslucent/);
 });
+
+test('mobile chat provides bounded history, replies, safe links and categorized emojis',()=>{
+ const source=fs.readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
+ assert.match(source,/\/api\/rooms\/\$\{auth\.room\}\/messages/);
+ assert.match(source,/replyId:replyTo\?\.id/);
+ assert.match(source,/kpnc-recent-emojis/);
+ assert.match(source,/MOBILE_EMOJIS/);
+ for(const category of ['rostos','gestos','coracoes','animais','comida','atividades','objetos','simbolos'])assert(source.includes(category),category+' missing');
+ assert.match(source,/url\.username/);
+ assert.match(source,/accessibilityRole="link"/);
+});

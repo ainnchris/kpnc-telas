@@ -31,3 +31,20 @@ test('mobile microphone capture requests voice cleanup',()=>{
  assert.match(source,/noiseSuppression:true/);
  assert.match(source,/autoGainControl:true/);
 });
+
+test('mobile screen sharing offers source through 360p and high frame rates',()=>{
+ const source=fs.readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
+ for(const resolution of ["'source'","'1440'","'1080'","'720'","'480'","'360'"])assert(source.includes(resolution),resolution+' missing');
+ assert.match(source,/frameRate:shareFps/);
+ assert.match(source,/SHARE_FPS:ShareFps\[\]=\[30,60,120\]/);
+ assert.match(source,/kpnc-share-quality/);
+});
+test('immersive mobile viewer keeps fullscreen, zoom, landscape and chat modes together',()=>{
+ const source=fs.readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
+ assert.match(source,/OrientationLock\.LANDSCAPE/);
+ assert.match(source,/Tela \+ chat/);
+ assert.match(source,/Math\.min\(3/);
+ assert.match(source,/Math\.max\(1/);
+ assert.match(source,/viewerMode==='chat'/);
+ assert.match(source,/statusBarTranslucent/);
+});

@@ -15,8 +15,14 @@ assert(!mobile.includes('&secret='),'mobile client must not put admission secret
 assert(worker.includes('MAX_REQUESTS_PER_ROOM'),'waiting room must have an abuse limit');
 assert(worker.includes("result === 'locked'")&&worker.includes('setLocked'),'locked rooms must reject new join requests at the coordinator');
 assert(!worker.includes('roomAdmin: host'),'browser token must not receive server administration privileges');
+assert(worker.includes('authorizeHost')&&worker.includes('authorizeAdmin'),'host-only and delegated administration must stay separate');
+assert(worker.includes("role: 'cohost'")&&worker.includes('secureEqual(member.secretHash, adminHash)'),'cohosts must use revocable hashed credentials');
+assert(worker.includes("'UpdateParticipant'")&&worker.includes('can_publish_sources')&&worker.includes('can_publish_data'),'individual media and chat permissions must be enforced by LiveKit');
+assert(worker.includes("'DeleteRoom'"),'ending a room must be enforced by the server instead of trusting a peer data message');
+assert(web.includes('Transferir a função de anfitrião')&&mobile.includes('Transferir anfitrião'),'host transfer must require an explicit user action');
+assert(web.includes('state.memberKey')&&mobile.includes('memberKey=auth.memberKey'),'clients must poll their own role without sharing the original host key');
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');
 assert.match(headers,/Content-Security-Policy:/,'published site must define a CSP');
 assert.match(headers,/frame-ancestors 'none'/,'published site must block framing');
 
-console.log('PASS: admission secrets, privilege scope, waiting-room limit, SRI and security headers');
+console.log('PASS: admission secrets, scoped moderator credentials, enforced participant permissions, SRI and security headers');

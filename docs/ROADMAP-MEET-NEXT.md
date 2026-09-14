@@ -21,15 +21,15 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - controles do anfitrião para bloquear novas entradas e silenciar todos;
 - ícones normal, adaptativo e monocromático do Android;
 - download e verificação SHA-256 da atualização Android dentro do aplicativo, mantendo a confirmação de instalação exigida pelo sistema;
-- suporte de código a atualizações rápidas Expo, ainda aguardando vinculação do projeto EAS.
+- suporte de código a atualizações rápidas Expo, ainda aguardando vinculação do projeto EAS;
+- coanfitriões com credenciais próprias e revogáveis, transferência de anfitrião e permissões individuais de microfone, câmera, chat e compartilhamento.
 
 ## Próximas etapas
 
 ### Reunião e moderação
 
-- coanfitrião e transferência de anfitrião;
-- permissões por participante para microfone, câmera, chat e compartilhamento;
-- confirmação e estados claros para ações administrativas;
+- validar coanfitrião, transferência e permissões em chamadas reais entre navegador, Windows e Android;
+- completar confirmações, histórico e estados visuais para todas as ações administrativas;
 - revisar o histórico e os avisos do chat, links, respostas e acessibilidade.
 
 ### Experiência de apresentação

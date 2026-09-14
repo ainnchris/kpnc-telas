@@ -1,7 +1,7 @@
 export const WEBSITE = 'https://kpnc-meet.pages.dev';
 const API = 'https://kpnc-meet-api.erikchristian2.workers.dev';
 export interface Profile {name:string; avatar:string}
-export interface Auth {token:string;url:string;room:string;host:boolean;hostKey?:string}
+export interface Auth {token:string;url:string;room:string;host:boolean;hostKey?:string;memberKey?:string}
 export interface JoinRequest {requestId:string;requestSecret:string;room:string}
 export interface Pending {id:string;name:string;avatar?:string}
 export class ApiError extends Error {constructor(message:string,public status:number){super(message)}}

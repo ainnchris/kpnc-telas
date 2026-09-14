@@ -35,7 +35,8 @@ Legenda: **implementado** significa que o código e as verificações automátic
 ### Experiência de apresentação
 
 - validar cada resolução e FPS em máquinas e conexões diferentes, com adaptação quando o dispositivo não alcançar o valor escolhido;
-- validar os controles móveis de zoom e transmissão + chat em diferentes tamanhos de tela;\n- acrescentar a alternância de participantes ao visualizador imersivo;
+- validar os controles móveis de zoom e transmissão + chat em diferentes tamanhos de tela;
+- acrescentar a alternância de participantes ao visualizador imersivo;
 - testar tela cheia, paisagem e Picture-in-Picture em Android, iPhone e navegadores reais;
 - medir bitrate, perda de pacotes, uso de CPU/GPU e temperatura antes de definir padrões de qualidade.
 

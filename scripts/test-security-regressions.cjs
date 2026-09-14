@@ -22,7 +22,7 @@ assert(worker.includes("'DeleteRoom'"),'ending a room must be enforced by the se
 assert(worker.includes('chatHistory(memberHash')&&worker.includes('this.member(room, memberHash)'),'chat history must require a room-member credential');
 assert(worker.includes("throw new Error('CHAT_BLOCKED')"),'server must enforce individual chat permission');
 assert(worker.includes('room.messages = room.messages.slice(-200)'),'room chat history must stay bounded');
-assert(web.includes('replyId:state.replyTo?.id')&&mobile.includes("replyId:replyTo?.id||''"),'replies must reference server-side message IDs');
+assert(web.includes('replyId=state.replyTo?.id')&&mobile.includes("replyId:replyTo?.id||''"),'replies must reference server-side message IDs');
 assert(web.includes('Transferir a função de anfitrião')&&mobile.includes('Transferir anfitrião'),'host transfer must require an explicit user action');
 assert(web.includes('state.memberKey')&&mobile.includes('memberKey=auth.memberKey'),'clients must poll their own role without sharing the original host key');
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');

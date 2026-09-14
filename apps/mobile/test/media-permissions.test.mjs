@@ -25,3 +25,9 @@ test('android updates keep one package and support verified in-app installation'
  assert.match(source,/android\.intent\.action\.VIEW/);
  assert.match(source,/availableUpdate\.sha256/);
 });
+test('mobile microphone capture requests voice cleanup',()=>{
+ const source=fs.readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
+ assert.match(source,/echoCancellation:true/);
+ assert.match(source,/noiseSuppression:true/);
+ assert.match(source,/autoGainControl:true/);
+});

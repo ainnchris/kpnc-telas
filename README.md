@@ -16,14 +16,17 @@ Plataforma de videoconferências com identidade própria, disponível no navegad
 - criação de reunião e entrada por código ou link;
 - sala de espera com aprovação ou recusa pelo anfitrião;
 - câmera, microfone e seleção de dispositivos;
+- teste de câmera, microfone e resposta da internet antes da entrada;
 - compartilhamento de tela e áudio quando a plataforma oferece suporte;
-- grade responsiva, destaque de quem está falando e ampliação de apresentações;
-- lista de participantes, chat, emojis e mão levantada;
-- remoção, silenciamento e encerramento pelo anfitrião;
+- escolha de resolução e FPS da apresentação no navegador/aplicativo Windows;
+- grade responsiva, destaque de quem está falando, tela cheia móvel e janela flutuante;
+- lista de participantes, chat com emojis por categoria e mão levantada;
+- remoção, silenciamento, bloqueio de novas entradas e encerramento pelo anfitrião;
 - perfil local com nome, foto, GIF pequeno e avatares próprios;
 - quatro temas de interface;
 - gravação local e legendas nos navegadores compatíveis;
-- atualizador do aplicativo Windows com verificação SHA-256.
+- atualizador do aplicativo Windows com verificação SHA-256;
+- atualização Android baixada e verificada dentro do aplicativo, com confirmação final do sistema.
 
 ## Arquitetura
 
@@ -40,10 +43,11 @@ Os segredos `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` pertencem somente ao Worker
 ## Branches
 
 - `main`: site e API publicados;
-- `feat/meet-multiplataforma`: desenvolvimento dos clientes Windows e Android/iOS;
+- `feat/meet-next`: desenvolvimento da próxima grande atualização do Meet;
+- `feat/meet-multiplataforma`: histórico da primeira etapa dos clientes Windows e Android/iOS;
 - `backup-estavel-2026-08-20` e `backup-meet-2026-09-09`: cópias de segurança que não devem ser modificadas.
 
-O desenvolvimento multiplataforma continua separado da `main` até a conclusão dos testes reais. Consulte [`docs/APLICATIVOS.md`](https://github.com/ainnchris/kpnc-telas/blob/feat/meet-multiplataforma/docs/APLICATIVOS.md) e os registros em `docs/VERSAO-*.md` nessa branch.
+O desenvolvimento da próxima versão continua separado da `main` até a conclusão dos testes reais. Consulte [`docs/ROADMAP-MEET-NEXT.md`](docs/ROADMAP-MEET-NEXT.md), [`docs/APLICATIVOS.md`](docs/APLICATIVOS.md) e os registros em `docs/VERSAO-*.md`.
 
 ## Desenvolvimento local
 
@@ -99,6 +103,7 @@ Para operação pública, recomenda-se configurar limitação de tráfego no Clo
 ## Limitações conhecidas
 
 - Android ainda precisa de validação de câmera, microfone, teclado, reconexão e segundo plano em aparelho físico;
+- o canal rápido de atualização Android ainda precisa ser vinculado a um projeto EAS e o APK definitivo precisa de uma chave de assinatura estável;
 - iOS foi compilado apenas para simulador e ainda depende de assinatura, CallKit e teste em iPhone;
 - GIFs grandes dependem de armazenamento externo e continuam adiados;
 - a transcrição local não está disponível no aplicativo Windows;

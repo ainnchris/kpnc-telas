@@ -3,9 +3,18 @@
     "name": "Kpnc Meet",
     "slug": "kpnc-meet",
     "version": "0.4.0",
+    "icon": "./assets/icon.png",
     "scheme": "kpncmeet",
     "orientation": "default",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#07142b"
+    },
     "ios": {
       "bundleIdentifier": "dev.kpnc.meet",
       "supportsTablet": true,
@@ -19,6 +28,11 @@
     },
     "android": {
       "package": "dev.kpnc.meet",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#07142b"
+      },
       "softwareKeyboardLayoutMode": "resize",
       "versionCode": 4,
       "permissions": [
@@ -27,7 +41,8 @@
         "MODIFY_AUDIO_SETTINGS",
         "BLUETOOTH_CONNECT",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MEDIA_PROJECTION"
+        "FOREGROUND_SERVICE_MEDIA_PROJECTION",
+        "REQUEST_INSTALL_PACKAGES"
       ]
     },
     "plugins": [

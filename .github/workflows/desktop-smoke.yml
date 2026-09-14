@@ -1,7 +1,7 @@
 name: Abertura do aplicativo Windows
 on:
   push:
-    branches: [feat/meet-multiplataforma]
+    branches: [feat/meet-multiplataforma, feat/meet-next]
     paths: [apps/desktop/**, .github/workflows/desktop-smoke.yml]
   workflow_dispatch:
 permissions:

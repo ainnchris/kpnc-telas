@@ -2,7 +2,7 @@
 
 ## Estado desta etapa
 
-Desenvolvimento isolado em `feat/meet-multiplataforma`, a partir do commit `2834387e604396a217446b9b7a8a980436f5e3f0`.
+Os primeiros clientes foram desenvolvidos em `feat/meet-multiplataforma`. Essa base foi incorporada a `feat/meet-next`, branch atual da próxima grande versão. A `main` permanece estável até a validação final.
 
 - Não modificar `backup-estavel-2026-08-20` nem `backup-meet-2026-09-09`.
 - Não substituir `main` antes de validar as chamadas entre plataformas.
@@ -34,7 +34,7 @@ Desenvolvimento isolado em `feat/meet-multiplataforma`, a partir do commit `2834
 | Continuidade em segundo plano | Depende de manter a janela/processo aberto | **Pendente: serviço de chamada** | Áudio configurado; **pendente: CallKit e testes** |
 | Prévia de câmera antes da entrada | Interface web existente | Implementada, com ativação explícita | Implementada, com ativação explícita |
 | Legendas, gravação composta, efeitos nativos | Recursos/limitações do site atual | **Pendente** | **Pendente** |
-| Atualização automática do binário | **Pendente: canal assinado**; site atualiza online | Lojas/distribuição pendentes | Lojas/distribuição pendentes |
+| Atualização do aplicativo | Atualizador com SHA-256 implementado; assinatura comercial pendente | Download verificado dentro do app; canal EAS e assinatura estável pendentes | Canal EAS, assinatura e distribuição pendentes |
 
 “Implementado” descreve o código, não certificação em hardware. Esta etapa **não é uma entrega completa de paridade**. Não divulgar como versão final.
 

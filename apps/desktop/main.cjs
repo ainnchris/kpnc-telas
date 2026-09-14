@@ -2,6 +2,7 @@
 const {app, BrowserWindow, Menu, session, dialog, desktopCapturer, ipcMain, shell, clipboard} = require('electron');
 const path = require('node:path');
 const {SITE, isMeetURL, meetingLink} = require('./policy.cjs');
+const hardware=require('./hardware-acceleration.cjs');
 if (!app.isPackaged && (process.argv.includes('--smoke-test') || process.argv.includes('--media-smoke'))) {
   const profile = path.join(__dirname,'dist','smoke-profile');
   require('node:fs').mkdirSync(profile,{recursive:true});
@@ -9,6 +10,7 @@ if (!app.isPackaged && (process.argv.includes('--smoke-test') || process.argv.in
 }
 let main, picker, pendingCapture;
 let permissions;
+const hardwareEnabledAtStartup=hardware.applyHardwareAcceleration(app);
 const startupLink = process.argv.map(meetingLink).find(Boolean) || SITE;
 function trusted(contents, url) {
   return !!main && !main.isDestroyed() && contents === main.webContents && isMeetURL(url);
@@ -60,6 +62,7 @@ async function createWindow() {
     webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:'persist:kpnc-meet'}});
   require('./updater.cjs').setupUpdater({app,ipcMain,getMain:()=>main,shell});
   require('./window-controls.cjs').setupWindowControls({ipcMain,getMain:()=>main,clipboard});
+  hardware.setupHardwareAcceleration({app,ipcMain,getMain:()=>main,enabledAtStartup:hardwareEnabledAtStartup});
   for(const event of ['maximize','unmaximize','enter-full-screen','leave-full-screen'])main.on(event,()=>main.webContents.send('meet:window-state',{maximized:main.isMaximized(),fullscreen:main.isFullScreen()}));
   const ses = session.fromPartition('persist:kpnc-meet');
   permissions=require('./permissions.cjs').setupPermissions({ses,getMain:()=>main,BrowserWindow,ipcMain,path});

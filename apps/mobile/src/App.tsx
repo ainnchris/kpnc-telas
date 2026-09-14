@@ -7,15 +7,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Ionicons} from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import {File,Paths} from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
+import * as Crypto from 'expo-crypto';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import {StatusBar} from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
+import * as Updates from 'expo-updates';
 import {AudioSession, LiveKitRoom, VideoTrack, isTrackReference, useRoomContext, useTracks} from '@livekit/react-native';
-import {createLocalVideoTrack, LocalVideoTrack, Participant, RoomEvent, Track} from 'livekit-client';
+import {createLocalAudioTrack, createLocalVideoTrack, LocalVideoTrack, Participant, RoomEvent, Track} from 'livekit-client';
 import {api, ApiError, Auth, JoinRequest, Pending, post, Profile, roomCode, WEBSITE} from './api';
 
 const APP_VERSION='0.4.0';
 type Glyph = React.ComponentProps<typeof Ionicons>['name'];
 type Message = {id:string;name:string;text:string};
+type CheckState='off'|'checking'|'good'|'bad';
 const dark={bg:'#080c12',surface:'#131c2b',text:'#f2f5fc',muted:'#a7b4ca',border:'#29384e',accent:'#438dff'};
 const light={bg:'#f2f5fc',surface:'#ffffff',text:'#13223b',muted:'#576981',border:'#d2dceb',accent:'#2068dd'};
 const palettes={light,dark,gray:{...dark,bg:'#292d33',surface:'#373c44',border:'#5b626d',muted:'#c2c8d0'},black:{...dark,bg:'#000000',surface:'#101010',border:'#303030',muted:'#b8b8b8'}};
@@ -35,16 +42,35 @@ function participantProfile(p:Participant):Profile {
   let avatar=''; try{const data=JSON.parse(p.metadata||'{}');data.avatar=data.avatarPoster||data.avatar;if(typeof data.avatar==='string' && /^data:image\/(png|jpeg|webp);base64,/.test(data.avatar) && data.avatar.length<=12000)avatar=data.avatar}catch{}
   return {name:p.name||'Participante',avatar};
 }
-function errorMessage(error:unknown){return error instanceof Error?error.message:'Não foi possível concluir. Tente novamente.'}
+function errorMessage(error:unknown){
+  if(error instanceof ApiError)return error.message;
+  const name=error instanceof Error?error.name:'';
+  const value=error instanceof Error?error.message:'';
+  if(/^(Informe|Código|Esta reunião|O anfitrião|A atualização|Não foi possível)/i.test(value))return value;
+  if(['NotAllowedError','PermissionDeniedError'].includes(name)||/permission|denied|notallowed/i.test(value))return'O acesso foi bloqueado. Autorize câmera e microfone nas configurações do aparelho.';
+  if(['NotFoundError','DevicesNotFoundError'].includes(name))return'Nenhuma câmera ou microfone compatível foi encontrado.';
+  if(['NotReadableError','TrackStartError'].includes(name))return'O dispositivo está sendo usado por outro aplicativo. Feche-o e tente novamente.';
+  if(/network|fetch|offline|connection/i.test(value))return'Não foi possível acessar o serviço. Confira sua internet e tente novamente.';
+  return'Não foi possível concluir. Tente novamente.';
+}
+function DeviceCheck({label,state,detail}:{label:string;state:CheckState;detail:string}){
+  const c=React.useContext(Theme),color=state==='good'?'#25a76f':state==='bad'?'#d94b61':state==='checking'?'#e3a326':c.muted;
+  return <View style={[s.deviceCheck,{backgroundColor:c.surface,borderColor:c.border}]}><View style={[s.checkDot,{backgroundColor:color}]}/><View style={{flex:1,gap:2}}><Text style={{color:c.text,fontWeight:'700'}}>{label}</Text><Text style={{color:c.muted,fontSize:12}}>{detail}</Text></View></View>;
+}
 
 export default function Root(){return <SafeAreaProvider><App/></SafeAreaProvider>}
 function App() {
   const [profile,setProfile]=useState<Profile>({name:'',avatar:''});
-  const [availableUpdate,setAvailableUpdate]=useState<{version:string;url:string}|null>(null);
+  const [availableUpdate,setAvailableUpdate]=useState<{version:string;url:string;sha256:string}|null>(null);
+  const [nativeUpdating,setNativeUpdating]=useState(false);
+  const [otaReady,setOtaReady]=useState(false);
   const [loaded,setLoaded]=useState(false),[theme,setTheme]=useState<ThemeName>('light');
   const [screen,setScreen]=useState<'home'|'preview'|'waiting'|'meeting'>('home');
   const [mode,setMode]=useState<'create'|'join'>('create'),[code,setCode]=useState('');
   const [mic,setMic]=useState(false),[camera,setCamera]=useState(false);
+  const [cameraFacing,setCameraFacing]=useState<'user'|'environment'>('user');
+  const [checks,setChecks]=useState<{camera:CheckState;microphone:CheckState;network:CheckState}>({camera:'off',microphone:'off',network:'checking'});
+  const [networkDetail,setNetworkDetail]=useState('Verificando…');
   const [previewURL,setPreviewURL]=useState('');
   const [previewRevision,setPreviewRevision]=useState(0);
   const stopPreview=useRef<()=>void>(()=>{});
@@ -58,12 +84,18 @@ function App() {
     if(screen!=='home'||Platform.OS!=='android')return;
     let active=true;
     const check=async()=>{try{const response=await fetch(WEBSITE+'/updates.json');if(!response.ok)return;const data=await response.json(),u=data.android;
-      if(!u||typeof u.version!=='string'||!/^\d+\.\d+\.\d+$/.test(u.version)||typeof u.url!=='string')return;
+      if(!u||typeof u.version!=='string'||!/^\d+\.\d+\.\d+$/.test(u.version)||typeof u.url!=='string'||typeof u.sha256!=='string'||!/^[a-f\d]{64}$/i.test(u.sha256))return;
       const target=new URL(u.url),a=u.version.split('.').map(Number),b=APP_VERSION.split('.').map(Number),index=a.findIndex((n:number,i:number)=>n!==b[i]);
       if(active&&index>=0&&a[index]>b[index]&&target.protocol==='https:'&&target.hostname==='github.com'&&target.pathname.startsWith('/ainnchris/kpnc-telas/releases/download/')&&target.pathname.endsWith('.apk'))setAvailableUpdate(u);
     }catch{}};
     void check();const timer=setInterval(check,120000),listener=AppState.addEventListener('change',value=>{if(value==='active')void check()});
     return()=>{active=false;clearInterval(timer);listener.remove()};
+  },[screen]);
+  useEffect(()=>{
+    if(screen!=='home'||!Updates.isEnabled)return;
+    let active=true;
+    void Updates.checkForUpdateAsync().then(result=>result.isAvailable?Updates.fetchUpdateAsync():null).then(result=>{if(active&&result?.isNew)setOtaReady(true)}).catch(()=>{});
+    return()=>{active=false};
   },[screen]);
   useEffect(()=>{void SystemUI.setBackgroundColorAsync(c.bg).catch(()=>{})},[c.bg]);
   useEffect(()=>{
@@ -71,12 +103,27 @@ function App() {
     let cancelled=false;let track:LocalVideoTrack|undefined;
     const cleanup=()=>{cancelled=true;track?.stop();setPreviewURL('')};
     stopPreview.current=cleanup;
-    void createLocalVideoTrack({facingMode:'user'}).then(result=>{
+    setChecks(value=>({...value,camera:'checking'}));
+    void createLocalVideoTrack({facingMode:cameraFacing}).then(result=>{
       if(cancelled){result.stop();return}
-      track=result;setPreviewURL((result.mediaStream as unknown as NativeMediaStream)?.toURL()||'');
-    }).catch(error=>{if(!cancelled){setCamera(false);setError(errorMessage(error))}});
+      track=result;setPreviewURL((result.mediaStream as unknown as NativeMediaStream)?.toURL()||'');setChecks(value=>({...value,camera:'good'}));
+    }).catch(error=>{if(!cancelled){setCamera(false);setChecks(value=>({...value,camera:'bad'}));setError(errorMessage(error))}});
     return cleanup;
-  },[screen,camera,previewRevision]);
+  },[screen,camera,previewRevision,cameraFacing]);
+  useEffect(()=>{
+    if(screen!=='preview'){return}
+    if(!camera)setChecks(value=>({...value,camera:'off'}));
+    if(!mic){setChecks(value=>({...value,microphone:'off'}));return}
+    let active=true;setChecks(value=>({...value,microphone:'checking'}));
+    void AudioSession.startAudioSession().then(()=>createLocalAudioTrack({echoCancellation:true,noiseSuppression:true,autoGainControl:true})).then(track=>{track.stop();if(active)setChecks(value=>({...value,microphone:'good'}))}).catch(error=>{if(active){setMic(false);setChecks(value=>({...value,microphone:'bad'}));setError(errorMessage(error))}}).finally(()=>{if(active)void AudioSession.stopAudioSession().catch(()=>{})});
+    return()=>{active=false};
+  },[screen,mic,camera]);
+  useEffect(()=>{
+    if(screen!=='preview')return;
+    let active=true;const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000),started=Date.now();setChecks(value=>({...value,network:'checking'}));setNetworkDetail('Medindo resposta…');
+    void fetch(WEBSITE.replace('kpnc-meet.pages.dev','kpnc-meet-api.erikchristian2.workers.dev')+'/health',{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('health');const latency=Date.now()-started;if(active){setChecks(value=>({...value,network:latency<700?'good':'bad'}));setNetworkDetail(latency<250?`Boa resposta (${latency} ms)`:latency<700?`Resposta moderada (${latency} ms)`:`Resposta lenta (${latency} ms)`)}}).catch(()=>{if(active){setChecks(value=>({...value,network:'bad'}));setNetworkDetail('Não foi possível alcançar o serviço')}}).finally(()=>clearTimeout(timer));
+    return()=>{active=false;clearTimeout(timer);controller.abort()};
+  },[screen,previewRevision]);
   useEffect(()=>{let active=true;AsyncStorage.multiGet(['kpnc-profile','kpnc-theme']).then(values=>{
     if(!active)return;
     try{const p=JSON.parse(values[0][1]||'{}');setProfile({name:typeof p.name==='string'?p.name.slice(0,48):'',avatar:typeof p.avatar==='string'&&p.avatar.length<=12000?p.avatar:''})}catch{}
@@ -136,20 +183,35 @@ function App() {
       setProfile(p=>({...p,avatar}));
     }catch(error){setError(errorMessage(error))}
   }
+  async function installNativeUpdate(){
+    if(!availableUpdate||nativeUpdating||Platform.OS!=='android')return;
+    setNativeUpdating(true);setError('');
+    try{
+      const target=new File(Paths.cache,`Kpnc-Meet-${availableUpdate.version}.apk`),file=await File.downloadFileAsync(availableUpdate.url,target,{idempotent:true});
+      if(file.size>350*1024*1024){file.delete();setError('A atualização excedeu o limite de segurança e foi bloqueada.');return}
+      const digest=new Uint8Array(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256,await file.arrayBuffer())),hex=Array.from(digest,byte=>byte.toString(16).padStart(2,'0')).join('');
+      if(hex.toLowerCase()!==availableUpdate.sha256.toLowerCase()){file.delete();setError('A atualização não passou na verificação de integridade e foi bloqueada.');return}
+      const contentUri=await LegacyFileSystem.getContentUriAsync(file.uri);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW',{data:contentUri,flags:1,type:'application/vnd.android.package-archive'});
+    }catch{setError('Não foi possível baixar ou abrir a atualização. Confira sua internet e tente novamente.')}
+    finally{setNativeUpdating(false)}
+  }
   if(!loaded)return <SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><Text style={{color:c.text,padding:24}}>Carregando Kpnc Meet…</Text></SafeAreaView>;
   return <Theme.Provider value={c}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><KeyboardAvoidingView style={s.root} behavior={Platform.OS==='ios'?'padding':'height'}><StatusBar style={darkMode?'light':'dark'}/>
-    {screen==='meeting'&&auth ? <LiveKitRoom serverUrl={auth.url} token={auth.token} connect audio={mic} video={camera} options={{adaptiveStream:{pixelDensity:'screen'},dynacast:true}} onDisconnected={reset} onError={e=>Alert.alert('Reunião',e.message)}><Meeting auth={auth} onLeave={reset} theme={theme} setTheme={setTheme}/></LiveKitRoom> : <ScrollView ref={homeScroll} contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    {screen==='meeting'&&auth ? <LiveKitRoom serverUrl={auth.url} token={auth.token} connect audio={mic?{echoCancellation:true,noiseSuppression:true,autoGainControl:true}:false} video={camera} options={{adaptiveStream:{pixelDensity:'screen'},dynacast:true}} onDisconnected={reset} onError={e=>Alert.alert('Reunião',errorMessage(e))}><Meeting auth={auth} onLeave={reset} theme={theme} setTheme={setTheme}/></LiveKitRoom> : <ScrollView ref={homeScroll} contentContainerStyle={s.page} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
       <View style={s.header}><Text style={[s.brand,{color:c.text}]}>Kpnc <Text style={{color:c.accent}}>Meet</Text></Text><Button label="Tema" icon="color-palette" onPress={()=>setSettingsOpen(true)}/></View>
       {screen==='waiting' ? <View style={s.section}><Ionicons name="hourglass" size={54} color={c.accent}/><Text style={[s.title,{color:c.text}]}>Aguardando o anfitrião</Text><Text style={{color:c.muted}}>Sua solicitação foi enviada. Você entrará quando ela for aceita.</Text><Text style={{color:c.muted}}>{request?.room}</Text><Button label="Cancelar" icon="close" onPress={reset}/></View> : <>
       {screen==='preview'&&<Button label="Voltar" icon="arrow-back" onPress={reset} disabled={busy}/>}
-      {screen==='home'&&availableUpdate&&<View style={[s.section,{backgroundColor:c.surface,padding:16,borderRadius:12}]}><Text style={{color:c.text}}>Nova versão {availableUpdate.version} disponível</Text><Text style={{color:c.muted}}>O Android pedirá confirmação para instalar. Nenhuma reunião será interrompida.</Text><Button label="Baixar atualização" icon="download" onPress={()=>{void Linking.openURL(availableUpdate.url).catch(()=>setError('Não foi possível abrir o download.'))}}/><Button label="Depois" icon="time" onPress={()=>setAvailableUpdate(null)}/></View>}
+      {screen==='home'&&otaReady&&<View style={[s.section,{backgroundColor:c.surface,padding:16,borderRadius:12}]}><Text style={{color:c.text,fontWeight:'700'}}>Atualização rápida pronta</Text><Text style={{color:c.muted}}>A interface já foi baixada pelo próprio Kpnc Meet. Não é necessário instalar outro aplicativo.</Text><Button label="Aplicar e reiniciar" icon="refresh" onPress={()=>void Updates.reloadAsync()}/><Button label="Depois" icon="time" onPress={()=>setOtaReady(false)}/></View>}
+      {screen==='home'&&availableUpdate&&!otaReady&&<View style={[s.section,{backgroundColor:c.surface,padding:16,borderRadius:12}]}><Text style={{color:c.text}}>Nova versão {availableUpdate.version} disponível</Text><Text style={{color:c.muted}}>Esta versão altera componentes do Android e precisa da confirmação do sistema. Ela substituirá o Kpnc Meet atual e preservará seus dados.</Text><Button label={nativeUpdating?'Baixando e verificando…':'Atualizar pelo aplicativo'} icon="download" disabled={nativeUpdating} onPress={()=>void installNativeUpdate()}/><Button label="Depois" icon="time" disabled={nativeUpdating} onPress={()=>setAvailableUpdate(null)}/></View>}
       <Text style={[s.title,{color:c.text}]}>{screen==='home'?'Conversas que aproximam.':'Como você quer entrar?'}</Text>
-      {screen==='preview'&&!!previewURL&&<RTCView streamURL={previewURL} objectFit="cover" mirror style={{width:'100%',height:240,borderRadius:20}}/>}
+      {screen==='preview'&&!!previewURL&&<><RTCView streamURL={previewURL} objectFit="cover" mirror={cameraFacing==='user'} style={{width:'100%',height:240,borderRadius:20}}/><Button label={cameraFacing==='user'?'Usar câmera traseira':'Usar câmera frontal'} icon="camera-reverse" onPress={()=>setCameraFacing(value=>value==='user'?'environment':'user')}/></>}
       <View style={[s.profile,{backgroundColor:c.surface,borderColor:c.border}]}><Avatar profile={profile}/><View style={s.row}><Button label="Foto" icon="image" onPress={choosePhoto}/><Button label="Avatares" icon="happy" onPress={()=>setPresetsOpen(!presetsOpen)}/>{!!profile.avatar&&<Button label="Remover" icon="trash" onPress={()=>setProfile(p=>({...p,avatar:''}))}/>}</View>{presetsOpen&&<Presets onChoose={avatar=>{setProfile(p=>({...p,avatar}));setPresetsOpen(false)}}/>}<TextInput accessibilityLabel="Seu nome" placeholder="Seu nome" placeholderTextColor={c.muted} maxLength={48} value={profile.name} onChangeText={name=>setProfile(p=>({...p,name}))} style={[s.input,{color:c.text,borderColor:c.border}]}/><Text style={{color:c.muted}}>Seu perfil fica salvo neste aparelho.</Text></View>
       {screen==='home'?<View style={s.section}><Button label="Nova reunião" icon="add-circle" onPress={()=>{setMode('create');setError('');setScreen('preview')}}/><TextInput accessibilityLabel="Código ou link da reunião" placeholder="Código ou link da reunião" placeholderTextColor={c.muted} value={code} onChangeText={setCode} onFocus={()=>setTimeout(()=>homeScroll.current?.scrollToEnd({animated:true}),200)} autoCapitalize="none" autoCorrect={false} style={[s.input,{color:c.text,borderColor:c.border}]}/><Button label="Participar" icon="enter" disabled={!roomCode(code)} onPress={()=>{setMode('join');setError('');setScreen('preview')}}/><Text style={{color:c.muted}}>Windows, navegador, Android e iPhone nas mesmas salas.</Text></View>:<View style={s.section}>
         <Text style={{color:c.muted}}>Câmera e microfone começam desligados. Ative somente se desejar.</Text>
         <View style={s.setting}><Ionicons name="mic" size={24} color={c.text}/><Text style={{color:c.text,flex:1}}>Entrar com microfone</Text><Switch accessibilityLabel="Entrar com microfone" value={mic} onValueChange={setMic}/></View>
         <View style={s.setting}><Ionicons name="videocam" size={24} color={c.text}/><Text style={{color:c.text,flex:1}}>Entrar com câmera</Text><Switch accessibilityLabel="Entrar com câmera" value={camera} onValueChange={setCamera}/></View>
+        <View style={s.checks}><Text style={[s.subtitle,{color:c.text}]}>Teste antes de entrar</Text><DeviceCheck label="Câmera" state={checks.camera} detail={checks.camera==='good'?'Imagem pronta':checks.camera==='checking'?'Verificando…':checks.camera==='bad'?'Não foi possível iniciar':'Desligada — você pode entrar assim'}/><DeviceCheck label="Microfone" state={checks.microphone} detail={checks.microphone==='good'?'Permissão e captura prontas':checks.microphone==='checking'?'Verificando…':checks.microphone==='bad'?'Não foi possível iniciar':'Desligado — você pode entrar assim'}/><DeviceCheck label="Internet" state={checks.network} detail={networkDetail}/><Button label="Testar novamente" icon="refresh" onPress={()=>setPreviewRevision(value=>value+1)}/></View>
         <Button label={busy?'Conectando…':mode==='create'?'Criar reunião':'Solicitar entrada'} icon="arrow-forward-circle" onPress={enter} disabled={busy}/>
       </View>}</>}
       {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
@@ -163,11 +225,12 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   const {width,height}=useWindowDimensions();const wide=width>=700||width>height;
   const [toolsOpen,setToolsOpen]=useState(false),[speakers,setSpeakers]=useState<Set<string>>(new Set());
   const tracks=useTracks([Track.Source.Camera,Track.Source.ScreenShare]);
-  const [,refresh]=useState(0),[connection,setConnection]=useState(room.state);
+  const [,refresh]=useState(0),[connection,setConnection]=useState(room.state),[quality,setQuality]=useState('unknown');
   const [panel,setPanel]=useState<'people'|'chat'|null>(null),[pending,setPending]=useState<Pending[]>([]);
+  const [locked,setLocked]=useState(false);
   const [messages,setMessages]=useState<Message[]>([]),[draft,setDraft]=useState('');
   const [raised,setRaised]=useState<Set<string>>(new Set()),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [focused,setFocused]=useState<string|null>(null),[unread,setUnread]=useState(0);
+  const [focused,setFocused]=useState<string|null>(null),[fitMode,setFitMode]=useState<'contain'|'cover'>('contain'),[unread,setUnread]=useState(0);
   const [facing,setFacing]=useState<'user'|'environment'>('user');
   const screenCaptureRef=useRef<React.ElementRef<typeof ScreenCapturePickerView>>(null);
   const [audioOutputs,setAudioOutputs]=useState<string[]|null>(null);
@@ -175,6 +238,11 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   const connected=connection==='connected';
   const participants=[room.localParticipant,...Array.from(room.remoteParticipants.values())];
   const update=()=>refresh(n=>n+1);
+  useEffect(()=>{
+    if(focused===null){void ScreenOrientation.unlockAsync().catch(()=>{});return}
+    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(()=>{});
+    return()=>{void ScreenOrientation.unlockAsync().catch(()=>{})};
+  },[focused]);
   useEffect(()=>{
     const events=[RoomEvent.ParticipantConnected,RoomEvent.ParticipantDisconnected,RoomEvent.TrackMuted,RoomEvent.TrackUnmuted,RoomEvent.LocalTrackPublished,RoomEvent.LocalTrackUnpublished,RoomEvent.ParticipantMetadataChanged] as const;
     for(const event of events)room.on(event,update);
@@ -192,8 +260,9 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
       }catch{}
     };
     room.on(RoomEvent.DataReceived,data);room.on(RoomEvent.ConnectionStateChanged,setConnection);setConnection(room.state);
+    const qualityChanged=(value:unknown,participant:Participant)=>{if(participant===room.localParticipant||participant?.identity===room.localParticipant.identity)setQuality(String(value).toLowerCase())};room.on(RoomEvent.ConnectionQualityChanged,qualityChanged);
     const active=(list:Participant[])=>setSpeakers(new Set(list.map(p=>p.identity)));room.on(RoomEvent.ActiveSpeakersChanged,active);
-    return()=>{for(const event of events)room.off(event,update);room.off(RoomEvent.DataReceived,data);room.off(RoomEvent.ConnectionStateChanged,setConnection);room.off(RoomEvent.ActiveSpeakersChanged,active)};
+    return()=>{for(const event of events)room.off(event,update);room.off(RoomEvent.DataReceived,data);room.off(RoomEvent.ConnectionStateChanged,setConnection);room.off(RoomEvent.ConnectionQualityChanged,qualityChanged);room.off(RoomEvent.ActiveSpeakersChanged,active)};
   },[room,onLeave]);
   useEffect(()=>{
     if(!auth.host||!auth.hostKey)return;
@@ -208,6 +277,8 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   async function act(fn:()=>Promise<unknown>){if(busy)return;setBusy(true);setError('');try{await fn();update()}catch(error){console.warn('MEET_MEDIA_ACTION_FAILED',{name:error instanceof Error?error.name:'Error',message:errorMessage(error)});setError(errorMessage(error)+(Platform.OS==='android'&&/permission|denied|notallowed/i.test(errorMessage(error))?' Se você negou a permissão, autorize câmera/microfone nas configurações do Android.':''))}finally{setBusy(false)}}
   const publish=(topic:string,data:unknown)=>room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify(data)),{reliable:true,topic});
   async function decide(id:string,decision:'admit'|'deny') {await api(`/api/rooms/${auth.room}/requests/${id}/${decision}`,post({},auth.hostKey));setPending(items=>items.filter(item=>item.id!==id))}
+  async function toggleLock(){const result=await api<{locked:boolean}>(`/api/rooms/${auth.room}/settings`,post({locked:!locked},auth.hostKey));setLocked(result.locked)}
+  async function muteAll(){const targets=participants.filter(p=>p!==room.localParticipant).map(p=>({p,track:p.getTrackPublication(Track.Source.Microphone)})).filter(item=>item.track&&!item.track.isMuted);await Promise.all(targets.map(({p,track})=>api(`/api/rooms/${auth.room}/participants/${encodeURIComponent(p.identity)}/mute`,post({trackSid:track?.trackSid},auth.hostKey))))}
   async function send(){const text=draft.trim().slice(0,500);if(!text)return;await publish('chat',{text,name:room.localParticipant.name,at:Date.now()});setMessages(items=>[...items,{id:`${Date.now()}-local`,name:'Você',text}].slice(-200));setDraft('')}
   async function hand(){const id=room.localParticipant.identity,on=!raised.has(id);await publish('hand',{raised:on});setRaised(current=>{const next=new Set(current);on?next.add(id):next.delete(id);return next})}
   async function switchCamera(){const track=room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;if(track instanceof LocalVideoTrack){const next=facing==='user'?'environment':'user';await track.restartTrack({facingMode:next});setFacing(next)}}
@@ -235,17 +306,18 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
     return own.length?own.map(track=>({key:`${p.identity}:${track.source}`,participant:p,track})): [{key:`${p.identity}:avatar`,participant:p,track:null}];
   });
   const tile=(item:(typeof tiles)[number],fullscreen=false)=><View key={item.key} style={[s.tile,{backgroundColor:c.surface,borderColor:speakers.has(item.participant.identity)?'#32d583':c.border,width:fullscreen?'100%':wide?'48.5%':'100%',height:fullscreen?undefined:(wide?Math.max(150,height*.5):Math.min(310,width*.7))},fullscreen&&s.fullTile]}>
-    {item.track?<VideoTrack trackRef={item.track} style={StyleSheet.absoluteFill} objectFit={item.track.source===Track.Source.ScreenShare?'contain':'cover'}/>:<Avatar profile={participantProfile(item.participant)}/>}
-    <View style={s.tileCaption}><Ionicons name={item.participant.isMicrophoneEnabled?'mic':'mic-off'} size={16} color="white"/><Text numberOfLines={1} style={s.tileName}>{item.participant.name||'Participante'}{item.participant===room.localParticipant?' (você)':''}{raised.has(item.participant.identity)?' · ✋':''}</Text><Pressable accessibilityRole="button" accessibilityLabel={fullscreen?'Sair da tela cheia':'Ampliar transmissão'} onPress={()=>setFocused(fullscreen?null:item.key)}><Ionicons name={fullscreen?'contract-outline':'expand-outline'} color="white" size={25}/></Pressable></View>
+    {item.track?<VideoTrack trackRef={item.track} style={StyleSheet.absoluteFill} objectFit={item.track.source===Track.Source.ScreenShare?(fullscreen?fitMode:'contain'):'cover'}/>:<Avatar profile={participantProfile(item.participant)}/>}
+    <View style={s.tileCaption}><Ionicons name={item.participant.isMicrophoneEnabled?'mic':'mic-off'} size={16} color="white"/><Text numberOfLines={1} style={s.tileName}>{item.participant.name||'Participante'}{item.participant===room.localParticipant?' (você)':''}{raised.has(item.participant.identity)?' · ✋':''}</Text>{fullscreen&&item.track?.source===Track.Source.ScreenShare&&<Pressable accessibilityRole="button" accessibilityLabel={fitMode==='contain'?'Preencher a tela':'Mostrar a tela inteira'} onPress={()=>setFitMode(value=>value==='contain'?'cover':'contain')}><Ionicons name={fitMode==='contain'?'scan-outline':'contract-outline'} color="white" size={25}/></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={fullscreen?'Sair da tela cheia':'Ampliar transmissão'} onPress={()=>setFocused(fullscreen?null:item.key)}><Ionicons name={fullscreen?'contract-outline':'expand-outline'} color="white" size={25}/></Pressable></View>
   </View>;
-  return <View style={s.root}>
+  const connectionText=!connected?(connection==='reconnecting'?'Reconectando…':'Conectando…'):({excellent:'Conexão ótima',good:'Conexão boa',poor:'Conexão instável',lost:'Conexão perdida'} as Record<string,string>)[quality]||'Conectado';
+  return <View style={s.root}><StatusBar hidden={focused!==null} style="light"/>
     {Platform.OS==='ios'&&<View style={{width:1,height:1,position:'absolute',overflow:'hidden'}} pointerEvents="none"><ScreenCapturePickerView ref={screenCaptureRef}/></View>}
-    <View style={[s.meetingHeader,{borderColor:c.border}]}><View style={{flex:1,minWidth:0}}><Text style={[s.brand,{color:c.text}]}>Kpnc Meet</Text><Text numberOfLines={2} style={{fontSize:12,color:connected?'#43bb97':c.muted}}>{connected?'Conectado':connection==='reconnecting'?'Reconectando…':'Conectando…'} · {auth.room}</Text></View><Button label="Convidar" icon="link" onPress={()=>void Share.share({message:`Entre no Kpnc Meet: ${WEBSITE}/?room=${auth.room}`})}/></View>
+    <View style={[s.meetingHeader,{borderColor:c.border}]}><View style={{flex:1,minWidth:0}}><Text style={[s.brand,{color:c.text}]}>Kpnc Meet</Text><Text numberOfLines={2} style={{fontSize:12,color:quality==='poor'||quality==='lost'?'#e3a326':connected?'#43bb97':c.muted}}>{connectionText} · {auth.room}</Text></View><Button label="Convidar" icon="link" onPress={()=>void Share.share({message:`Entre no Kpnc Meet: ${WEBSITE}/?room=${auth.room}`})}/></View>
     <ScrollView contentContainerStyle={[s.grid,wide&&{flexDirection:'row',flexWrap:'wrap'}]}>{tiles.map(item=>tile(item))}</ScrollView>
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <View style={[s.primaryControls,{borderColor:c.border,backgroundColor:c.surface}]}>
       {([
-        [room.localParticipant.isMicrophoneEnabled?'mic':'mic-off','Mic',()=>void act(()=>room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled)),busy||!connected],
+        [room.localParticipant.isMicrophoneEnabled?'mic':'mic-off','Mic',()=>void act(()=>room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled,{echoCancellation:true,noiseSuppression:true,autoGainControl:true})),busy||!connected],
         [room.localParticipant.isCameraEnabled?'videocam':'videocam-off','Câmera',()=>void act(()=>room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled)),busy||!connected],
         ['chatbubbles',unread?'Chat ('+unread+')':'Chat',()=>{setPanel('chat');setUnread(0)},false],
         ['people',pending.length?'Pessoas ('+pending.length+')':'Pessoas',()=>setPanel('people'),false],
@@ -260,18 +332,18 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
       {room.localParticipant.isCameraEnabled&&<Button label="Inverter câmera" icon="camera-reverse" disabled={busy} onPress={()=>void act(switchCamera)}/>}
       <Text style={[s.subtitle,{color:c.text}]}>Tema</Text><ThemeChoices value={theme} onChange={setTheme}/><Button label="Voltar à reunião" icon="arrow-back-circle" onPress={()=>setToolsOpen(false)}/>
     </ScrollView></SafeAreaView></Modal>
-    <Modal visible={focused!==null} onRequestClose={()=>setFocused(null)} supportedOrientations={['portrait','landscape']}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}>{tiles.find(t=>t.key===focused)?tile(tiles.find(t=>t.key===focused)!,true):<Text style={{color:c.text,padding:24}}>A transmissão terminou.</Text>}<Button label="Voltar à reunião" icon="contract" onPress={()=>setFocused(null)}/></SafeAreaView></Modal>
+    <Modal visible={focused!==null} animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={()=>setFocused(null)} supportedOrientations={['portrait','landscape']}><View style={[s.root,{backgroundColor:'#000'}]}>{tiles.find(t=>t.key===focused)?tile(tiles.find(t=>t.key===focused)!,true):<Text style={{color:'white',padding:24}}>A transmissão terminou.</Text>}</View></Modal>
     <Modal visible={audioOutputs!==null} onRequestClose={()=>setAudioOutputs(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.section}><Text style={[s.title,{color:c.text}]}>Saída de áudio</Text>{audioOutputs?.map(output=><Button key={output} label={({speaker:'Alto-falante',earpiece:'Fone do aparelho',bluetooth:'Bluetooth',headset:'Fone de ouvido'} as Record<string,string>)[output]||output} icon="volume-high" disabled={busy} onPress={()=>void act(async()=>{await AudioSession.selectAudioOutput(output);setAudioOutputs(null)})}/>)}<Button label="Voltar" icon="arrow-back" onPress={()=>setAudioOutputs(null)}/></View></SafeAreaView></Modal>
     <Modal visible={panel!==null} animationType="slide" onRequestClose={()=>setPanel(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><KeyboardAvoidingView style={s.root} behavior={Platform.OS==='ios'?'padding':'height'}><View style={s.meetingHeader}><Text style={[s.brand,{color:c.text,flex:1}]}>{panel==='chat'?'Chat da reunião':'Participantes'}</Text><Button label="Fechar" icon="close" onPress={()=>setPanel(null)}/></View>
       {panel==='chat'?<><ScrollView contentContainerStyle={s.section} keyboardShouldPersistTaps="handled">{messages.length===0&&<Text style={{color:c.muted}}>As mensagens aparecem aqui durante a reunião.</Text>}{messages.map(m=><View key={m.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.accent,fontWeight:'700'}}>{m.name}</Text><Text selectable style={{color:c.text}}>{m.text}</Text></View>)}</ScrollView><View style={s.composer}><TextInput accessibilityLabel="Mensagem" placeholder="Escreva uma mensagem" placeholderTextColor={c.muted} value={draft} onChangeText={setDraft} maxLength={500} style={[s.input,{color:c.text,borderColor:c.border,flex:1}]} onSubmitEditing={()=>void act(send)}/><Button label="Enviar" icon="send" disabled={busy||!draft.trim()||!connected} onPress={()=>void act(send)}/></View></>:<ScrollView contentContainerStyle={s.section}>
         {auth.host&&<><Text style={[s.subtitle,{color:c.text}]}>Aguardando para entrar ({pending.length})</Text>{pending.map(p=><View key={p.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.text}}>{p.name}</Text><View style={s.row}><Button label="Aceitar" icon="checkmark" disabled={busy} onPress={()=>void act(()=>decide(p.id,'admit'))}/><Button label="Recusar" icon="close" disabled={busy} onPress={()=>void act(()=>decide(p.id,'deny'))}/></View></View>)}</>}
         <Text style={[s.subtitle,{color:c.text}]}>Na reunião ({participants.length})</Text>{participants.map(p=><View key={p.identity} style={[s.bubble,{backgroundColor:c.surface}]}><View style={s.row}><Avatar profile={participantProfile(p)} size={40}/><Text style={{color:c.text,flex:1}}>{p.name||'Participante'}{p===room.localParticipant?' (você)':''}{p.identity.startsWith('host-')?' · ♛':''}{raised.has(p.identity)?' · ✋':''}</Text><Ionicons name={p.isMicrophoneEnabled?'mic':'mic-off'} size={20} color={c.muted}/></View>{auth.host&&p!==room.localParticipant&&<View style={s.row}><Button label="Silenciar" icon="mic-off" disabled={busy||!p.isMicrophoneEnabled} onPress={()=>void act(async()=>{const trackSid=p.getTrackPublication(Track.Source.Microphone)?.trackSid;if(trackSid)await api(`/api/rooms/${auth.room}/participants/${encodeURIComponent(p.identity)}/mute`,post({trackSid},auth.hostKey))})}/><Button label="Remover" icon="person-remove" disabled={busy} onPress={()=>Alert.alert('Remover participante?',p.name||'Participante',[{text:'Cancelar',style:'cancel'},{text:'Remover',style:'destructive',onPress:()=>void act(()=>api(`/api/rooms/${auth.room}/participants/${encodeURIComponent(p.identity)}/remove`,post({},auth.hostKey)))}])}/></View>}</View>)}
-        {auth.host&&<Button label="Encerrar para todos" icon="stop-circle" danger disabled={busy} onPress={end}/>}
+        {auth.host&&<><View style={s.row}><Button label={locked?'Permitir novas entradas':'Bloquear novas entradas'} icon={locked?'lock-open':'lock-closed'} disabled={busy} onPress={()=>void act(toggleLock)}/><Button label="Silenciar todos" icon="mic-off" disabled={busy} onPress={()=>Alert.alert('Silenciar todos?','Os outros participantes ficarão com o microfone desligado.',[{text:'Cancelar',style:'cancel'},{text:'Silenciar',onPress:()=>void act(muteAll)}])}/></View><Button label="Encerrar para todos" icon="stop-circle" danger disabled={busy} onPress={end}/></>}
       </ScrollView>}
       {!!error&&<Text style={s.error}>{error}</Text>}
     </KeyboardAvoidingView></SafeAreaView></Modal>
   </View>;
 }
 const s=StyleSheet.create({
-  root:{flex:1},page:{padding:20,gap:20,paddingBottom:32,width:'100%',maxWidth:780,alignSelf:'center'},header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},brand:{fontSize:21,fontWeight:'800'},title:{fontSize:30,fontWeight:'800',lineHeight:36},subtitle:{fontSize:20,fontWeight:'700'},section:{padding:18,gap:16},row:{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},profile:{borderWidth:1,borderRadius:24,padding:22,gap:16,alignItems:'center'},avatar:{backgroundColor:'#308ee3',alignItems:'center',justifyContent:'center'},input:{borderWidth:1,borderRadius:14,padding:16,fontSize:17,minHeight:54,width:'100%'},button:{minHeight:48,padding:12,borderRadius:14,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},buttonText:{fontSize:13,fontWeight:'600'},setting:{flexDirection:'row',alignItems:'center',gap:12,minHeight:48},error:{color:'#e15a6b',padding:14},meetingHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',padding:16,borderBottomWidth:1,gap:10},grid:{padding:12,gap:12},primaryControls:{flexDirection:'row',padding:8,gap:4,borderTopWidth:1},primaryControl:{flex:1,alignItems:'center',gap:5,minWidth:0},controlIcon:{width:40,height:40,borderRadius:15,alignItems:'center',justifyContent:'center'},tile:{borderWidth:2,height:260,backgroundColor:'#182235',borderRadius:18,overflow:'hidden',alignItems:'center',justifyContent:'center'},fullTile:{flex:1,height:undefined,borderRadius:0},tileCaption:{position:'absolute',bottom:0,left:0,right:0,backgroundColor:'#000a',padding:12,flexDirection:'row',alignItems:'center',gap:8},tileName:{color:'white',flex:1},controls:{padding:10,paddingBottom:16,flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8,borderTopWidth:1},bubble:{padding:16,borderRadius:16,gap:12},composer:{padding:10,flexDirection:'row',alignItems:'center',gap:8}
+  root:{flex:1},page:{padding:20,gap:20,paddingBottom:32,width:'100%',maxWidth:780,alignSelf:'center'},header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},brand:{fontSize:21,fontWeight:'800'},title:{fontSize:30,fontWeight:'800',lineHeight:36},subtitle:{fontSize:20,fontWeight:'700'},section:{padding:18,gap:16},row:{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},profile:{borderWidth:1,borderRadius:24,padding:22,gap:16,alignItems:'center'},avatar:{backgroundColor:'#308ee3',alignItems:'center',justifyContent:'center'},input:{borderWidth:1,borderRadius:14,padding:16,fontSize:17,minHeight:54,width:'100%'},button:{minHeight:48,padding:12,borderRadius:14,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},buttonText:{fontSize:13,fontWeight:'600'},setting:{flexDirection:'row',alignItems:'center',gap:12,minHeight:48},checks:{gap:9,padding:14,borderRadius:18},deviceCheck:{minHeight:58,padding:12,borderWidth:1,borderRadius:14,flexDirection:'row',alignItems:'center',gap:11},checkDot:{width:10,height:10,borderRadius:5},error:{color:'#e15a6b',padding:14},meetingHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',padding:16,borderBottomWidth:1,gap:10},grid:{padding:12,gap:12},primaryControls:{flexDirection:'row',padding:8,gap:4,borderTopWidth:1},primaryControl:{flex:1,alignItems:'center',gap:5,minWidth:0},controlIcon:{width:40,height:40,borderRadius:15,alignItems:'center',justifyContent:'center'},tile:{borderWidth:2,height:260,backgroundColor:'#182235',borderRadius:18,overflow:'hidden',alignItems:'center',justifyContent:'center'},fullTile:{flex:1,height:undefined,borderRadius:0},tileCaption:{position:'absolute',bottom:0,left:0,right:0,backgroundColor:'#000a',padding:12,flexDirection:'row',alignItems:'center',gap:8},tileName:{color:'white',flex:1},controls:{padding:10,paddingBottom:16,flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8,borderTopWidth:1},bubble:{padding:16,borderRadius:16,gap:12},composer:{padding:10,flexDirection:'row',alignItems:'center',gap:8}
 });

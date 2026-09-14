@@ -1,7 +1,7 @@
 name: Aplicativos de teste
 on:
   push:
-    branches: [feat/meet-multiplataforma]
+    branches: [feat/meet-multiplataforma, feat/meet-next]
     paths: [apps/**, pnpm-lock.yaml, pnpm-workspace.yaml, .github/workflows/apps.yml]
   workflow_dispatch:
 permissions:
@@ -25,6 +25,8 @@ jobs:
           MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           if [ "$MANUAL" = "true" ]; then
+            echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          elif [[ "$BEFORE" =~ ^0+$ ]]; then
             echo 'mobile=true' >> "$GITHUB_OUTPUT"
           elif git diff --name-only "$BEFORE" HEAD | grep -Eq '^(apps/mobile/|pnpm-lock.yaml|pnpm-workspace.yaml)'; then
             echo 'mobile=true' >> "$GITHUB_OUTPUT"
@@ -92,6 +94,7 @@ jobs:
           path: apps/desktop/dist/*.exe
           if-no-files-found: error
       - name: Publicar atualizacao Windows verificada
+        if: github.ref == 'refs/heads/feat/meet-multiplataforma'
         run: node scripts/publish-build.cjs windows
         env:
           GH_TOKEN: ${{ github.token }}
@@ -136,6 +139,7 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
       - name: Publicar atualizacao Android
+        if: github.ref == 'refs/heads/feat/meet-multiplataforma'
         run: node scripts/publish-build.cjs android
         env:
           GH_TOKEN: ${{ github.token }}

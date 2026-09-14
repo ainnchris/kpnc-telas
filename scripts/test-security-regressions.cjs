@@ -13,6 +13,7 @@ assert(worker.includes('clean(bearer(request), 128)'),'admission secret must pre
 assert(!web.includes('&secret='),'web client must not put admission secrets in URLs');
 assert(!mobile.includes('&secret='),'mobile client must not put admission secrets in URLs');
 assert(worker.includes('MAX_REQUESTS_PER_ROOM'),'waiting room must have an abuse limit');
+assert(worker.includes("result === 'locked'")&&worker.includes('setLocked'),'locked rooms must reject new join requests at the coordinator');
 assert(!worker.includes('roomAdmin: host'),'browser token must not receive server administration privileges');
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');
 assert.match(headers,/Content-Security-Policy:/,'published site must define a CSP');

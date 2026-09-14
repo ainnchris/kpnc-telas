@@ -9,13 +9,13 @@ const DEFAULT_ORIGINS = ['https://kpnc-meet.pages.dev', 'http://localhost:3000',
 
 type JoinStatus = 'waiting' | 'approved' | 'denied';
 type JoinRequest = { id: string; name: string; avatar: string; secretHash: string; status: JoinStatus; createdAt: number };
-type RoomState = { hostHash: string; createdAt: number; closed: boolean; requests: Record<string, JoinRequest> };
+type RoomState = { hostHash: string; createdAt: number; closed: boolean; locked: boolean; requests: Record<string, JoinRequest> };
 
 export class RoomCoordinator extends DurableObject<Env> {
   async create(hostHash: string): Promise<boolean> {
     const current = await this.ctx.storage.get<RoomState>('room');
     if (current && !current.closed && Date.now() - current.createdAt < ROOM_TTL_MS) return false;
-    await this.ctx.storage.put('room', { hostHash, createdAt: Date.now(), closed: false, requests: {} } satisfies RoomState);
+    await this.ctx.storage.put('room', { hostHash, createdAt: Date.now(), closed: false, locked: false, requests: {} } satisfies RoomState);
     await this.ctx.storage.setAlarm(Date.now() + ROOM_TTL_MS);
     return true;
   }
@@ -23,9 +23,10 @@ export class RoomCoordinator extends DurableObject<Env> {
     const room = await this.ctx.storage.get<RoomState>('room');
     return !!room && !room.closed && Date.now() - room.createdAt < ROOM_TTL_MS;
   }
-  async requestJoin(request: JoinRequest): Promise<'created' | 'missing' | 'full'> {
+  async requestJoin(request: JoinRequest): Promise<'created' | 'missing' | 'full' | 'locked'> {
     const room = await this.ctx.storage.get<RoomState>('room');
     if (!room || room.closed || Date.now() - room.createdAt >= ROOM_TTL_MS) return 'missing';
+    if (room.locked) return 'locked';
     this.prune(room);
     if (Object.keys(room.requests).length >= MAX_REQUESTS_PER_ROOM) return 'full';
     room.requests[request.id] = request;
@@ -57,6 +58,9 @@ export class RoomCoordinator extends DurableObject<Env> {
     room.closed = true;
     room.requests = {};
     await this.ctx.storage.put('room', room);
+  }
+  async setLocked(hostHash: string, locked: boolean): Promise<boolean> {
+    const room = await this.authorize(hostHash); room.locked = locked; await this.ctx.storage.put('room', room); return room.locked;
   }
   async hostAuthorized(hostHash: string): Promise<boolean> { await this.authorize(hostHash); return true; }
   async alarm(): Promise<void> { await this.ctx.storage.deleteAll(); }
@@ -140,6 +144,7 @@ export default {
         const id = crypto.randomUUID(); const secret = randomToken();
         const result = await coordinator(env, room).requestJoin({ id, name, avatar, secretHash: await sha256(secret), status: 'waiting', createdAt: Date.now() });
         if (result === 'missing') return json({ error: 'Esta reunião não existe ou já foi encerrada.', code: 'ROOM_NOT_FOUND' }, 404, origin);
+        if (result === 'locked') return json({ error: 'Esta reunião está bloqueada para novas entradas.', code: 'ROOM_LOCKED' }, 423, origin);
         if (result === 'full') return json({ error: 'A sala de espera está cheia. Tente novamente em alguns minutos.', code: 'WAITING_ROOM_FULL' }, 429, origin);
         return json({ room, requestId: id, requestSecret: secret, status: 'waiting' }, 202, origin);
       }
@@ -164,6 +169,8 @@ export default {
       }
       const closeMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/close$/i);
       if (request.method === 'POST' && closeMatch) { await coordinator(env, closeMatch[1]).close(await sha256(bearer(request))); return json({ ok: true }, 200, origin); }
+      const settingsMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/settings$/i);
+      if (request.method === 'POST' && settingsMatch) { const body = await readBody(request); if (typeof body.locked !== 'boolean') return json({ error: 'Configuração inválida.' }, 400, origin); const locked = await coordinator(env, settingsMatch[1]).setLocked(await sha256(bearer(request)), body.locked); return json({ ok: true, locked }, 200, origin); }
       const participantMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/participants\/([^/]+)\/(remove|mute)$/i);
       if (request.method === 'POST' && participantMatch) {
         const room = participantMatch[1]; const identity = clean(decodeURIComponent(participantMatch[2]), 128); const action = participantMatch[3];

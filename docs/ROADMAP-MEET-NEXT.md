@@ -1,0 +1,62 @@
+# Roteiro da próxima versão do Kpnc Meet
+
+Este documento mantém o escopo da grande atualização fora do histórico do chat. A implementação acontece em `feat/meet-next`; a `main` continua sendo a versão pública estável até a validação final.
+
+Legenda: **implementado** significa que o código e as verificações automáticas estão prontos nesta branch. Não substitui teste em aparelhos reais. **Em andamento** significa que apenas parte do fluxo está pronta.
+
+## Primeira etapa — implementada na branch
+
+- pré-entrada com teste de câmera, microfone, nível de áudio e resposta da internet;
+- mensagens de erro de dispositivos e rede em português e mais fáceis de entender;
+- troca entre câmera frontal e traseira na prévia e durante a reunião móvel;
+- redução de ruído, cancelamento de eco e ganho automático ao ativar o microfone;
+- indicador de qualidade da conexão;
+- apresentação fixada automaticamente, melhor aproveitamento da janela e volume agrupado com os controles da transmissão;
+- tela cheia da transmissão no navegador, alternativa para Safari móvel e modo paisagem no aplicativo;
+- janela flutuante (Picture-in-Picture) no navegador compatível;
+- seleção de `Source`, 1440p, 1080p, 720p, 480p ou 360p e 30, 60 ou 120 FPS para compartilhar pelo navegador/Windows;
+- aceleração de hardware configurável no aplicativo Windows, aplicada após reiniciar; no navegador ela permanece sob controle do próprio navegador;
+- chat web com busca, categorias e histórico recente de emojis;
+- controles do anfitrião para bloquear novas entradas e silenciar todos;
+- ícones normal, adaptativo e monocromático do Android;
+- download e verificação SHA-256 da atualização Android dentro do aplicativo, mantendo a confirmação de instalação exigida pelo sistema;
+- suporte de código a atualizações rápidas Expo, ainda aguardando vinculação do projeto EAS.
+
+## Próximas etapas
+
+### Reunião e moderação
+
+- coanfitrião e transferência de anfitrião;
+- permissões por participante para microfone, câmera, chat e compartilhamento;
+- confirmação e estados claros para ações administrativas;
+- revisar o histórico e os avisos do chat, links, respostas e acessibilidade.
+
+### Experiência de apresentação
+
+- validar cada resolução e FPS em máquinas e conexões diferentes, com adaptação quando o dispositivo não alcançar o valor escolhido;
+- controles móveis de zoom e alternância entre transmissão, participantes e chat sem perder a tela principal;
+- testar tela cheia, paisagem e Picture-in-Picture em Android, iPhone e navegadores reais;
+- medir bitrate, perda de pacotes, uso de CPU/GPU e temperatura antes de definir padrões de qualidade.
+
+### Aplicativos
+
+- Android em segundo plano, incluindo áudio com a tela apagada e notificação permanente com controles;
+- ativar o projeto/canal EAS para atualizações rápidas da interface;
+- configurar e preservar uma chave Android definitiva. Ao trocar a assinatura experimental atual pela definitiva, poderá ser necessária uma última reinstalação; depois disso, as atualizações poderão substituir o mesmo aplicativo;
+- completar e validar o atualizador do Windows com instalador assinado, retomada, progresso e recuperação de falhas;
+- testar câmera, microfone, Bluetooth, rotação, reconexão e atualização em aparelhos físicos.
+
+### Segurança e interface
+
+- estudar criptografia ponta a ponta opcional com gerenciamento e verificação de chaves; não anunciar E2EE antes da validação entre todos os clientes;
+- revisão visual conjunta com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, mantendo contraste, desempenho, movimento reduzido e acessibilidade;
+- auditoria de segurança e privacidade antes de promover a branch para `main`.
+
+## Critérios para publicação
+
+1. Compilações web, Worker, Windows, Android e iOS aprovadas.
+2. Testes reais entre navegador, Windows e pelo menos um aparelho Android.
+3. Instalação de uma atualização Android sobre a versão anterior usando a mesma assinatura.
+4. Testes de sala bloqueada, silenciar todos, compartilhamento, reconexão e permissões negadas.
+5. Nenhum segredo, certificado ou chave de assinatura versionado no Git.
+6. Revisão final do README, licença, política de privacidade e notas da versão.

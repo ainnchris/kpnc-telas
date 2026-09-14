@@ -23,6 +23,18 @@ const APP_VERSION='0.4.0';
 type Glyph = React.ComponentProps<typeof Ionicons>['name'];
 type Message = {id:string;name:string;text:string};
 type CheckState='off'|'checking'|'good'|'bad';
+type ShareResolution='source'|'1440'|'1080'|'720'|'480'|'360';
+type ShareFps=30|60|120;
+type ViewerMode='screen'|'chat';
+const SHARE_SIZES:Record<Exclude<ShareResolution,'source'>,{width:number;height:number}>={
+  '1440':{width:2560,height:1440},
+  '1080':{width:1920,height:1080},
+  '720':{width:1280,height:720},
+  '480':{width:854,height:480},
+  '360':{width:640,height:360}
+};
+const SHARE_RESOLUTIONS:ShareResolution[]=['source','1440','1080','720','480','360'];
+const SHARE_FPS:ShareFps[]=[30,60,120];
 const dark={bg:'#080c12',surface:'#131c2b',text:'#f2f5fc',muted:'#a7b4ca',border:'#29384e',accent:'#438dff'};
 const light={bg:'#f2f5fc',surface:'#ffffff',text:'#13223b',muted:'#576981',border:'#d2dceb',accent:'#2068dd'};
 const palettes={light,dark,gray:{...dark,bg:'#292d33',surface:'#373c44',border:'#5b626d',muted:'#c2c8d0'},black:{...dark,bg:'#000000',surface:'#101010',border:'#303030',muted:'#b8b8b8'}};
@@ -231,6 +243,8 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   const [messages,setMessages]=useState<Message[]>([]),[draft,setDraft]=useState('');
   const [raised,setRaised]=useState<Set<string>>(new Set()),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [focused,setFocused]=useState<string|null>(null),[fitMode,setFitMode]=useState<'contain'|'cover'>('contain'),[unread,setUnread]=useState(0);
+  const [shareSettingsOpen,setShareSettingsOpen]=useState(false),[shareResolution,setShareResolution]=useState<ShareResolution>('source'),[shareFps,setShareFps]=useState<ShareFps>(30);
+  const [viewerMode,setViewerMode]=useState<ViewerMode>('screen'),[zoom,setZoom]=useState(1);
   const [facing,setFacing]=useState<'user'|'environment'>('user');
   const screenCaptureRef=useRef<React.ElementRef<typeof ScreenCapturePickerView>>(null);
   const [audioOutputs,setAudioOutputs]=useState<string[]|null>(null);
@@ -243,6 +257,14 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(()=>{});
     return()=>{void ScreenOrientation.unlockAsync().catch(()=>{})};
   },[focused]);
+  useEffect(()=>{void AsyncStorage.getItem('kpnc-share-quality').then(value=>{
+    if(!value)return;
+    try {
+      const saved=JSON.parse(value) as {resolution?:ShareResolution;fps?:ShareFps};
+      if(SHARE_RESOLUTIONS.includes(saved.resolution as ShareResolution))setShareResolution(saved.resolution as ShareResolution);
+      if(SHARE_FPS.includes(saved.fps as ShareFps))setShareFps(saved.fps as ShareFps);
+    } catch {}
+  })},[]);
   useEffect(()=>{
     const events=[RoomEvent.ParticipantConnected,RoomEvent.ParticipantDisconnected,RoomEvent.TrackMuted,RoomEvent.TrackUnmuted,RoomEvent.LocalTrackPublished,RoomEvent.LocalTrackUnpublished,RoomEvent.ParticipantMetadataChanged] as const;
     for(const event of events)room.on(event,update);
@@ -282,16 +304,24 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   async function send(){const text=draft.trim().slice(0,500);if(!text)return;await publish('chat',{text,name:room.localParticipant.name,at:Date.now()});setMessages(items=>[...items,{id:`${Date.now()}-local`,name:'Você',text}].slice(-200));setDraft('')}
   async function hand(){const id=room.localParticipant.identity,on=!raised.has(id);await publish('hand',{raised:on});setRaised(current=>{const next=new Set(current);on?next.add(id):next.delete(id);return next})}
   async function switchCamera(){const track=room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;if(track instanceof LocalVideoTrack){const next=facing==='user'?'environment':'user';await track.restartTrack({facingMode:next});setFacing(next)}}
-  async function screenShare(){
+  async function startScreenShare(){
     const participant=room.localParticipant;
-    if(participant.isScreenShareEnabled){await participant.setScreenShareEnabled(false);return}
     if(Platform.OS==='ios'){
       const node=findNodeHandle(screenCaptureRef.current);
       if(!node||!NativeModules.ScreenCapturePickerViewManager)throw new Error('O seletor de transmissão não está disponível neste aparelho.');
       await NativeModules.ScreenCapturePickerViewManager.show(node);
     }
-    await participant.setScreenShareEnabled(true);
+    const size=shareResolution==='source'?undefined:SHARE_SIZES[shareResolution];
+    const options={
+      ...(size?{resolution:{...size,frameRate:shareFps}}:{}),
+      contentHint:(shareFps>=60?'motion':'detail') as 'motion'|'detail'
+    };
+    await participant.setScreenShareEnabled(true,options);
+    await AsyncStorage.setItem('kpnc-share-quality',JSON.stringify({resolution:shareResolution,fps:shareFps}));
+    setShareSettingsOpen(false);
   }
+  function openViewer(key:string){setViewerMode('screen');setFitMode('contain');setZoom(1);setFocused(key)}
+  function closeViewer(){setFocused(null);setViewerMode('screen');setZoom(1)}
   async function selectOutput(){
     if(Platform.OS==='ios'){await AudioSession.showAudioRoutePicker();return}
     const outputs=await AudioSession.getAudioOutputs();
@@ -306,8 +336,8 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
     return own.length?own.map(track=>({key:`${p.identity}:${track.source}`,participant:p,track})): [{key:`${p.identity}:avatar`,participant:p,track:null}];
   });
   const tile=(item:(typeof tiles)[number],fullscreen=false)=><View key={item.key} style={[s.tile,{backgroundColor:c.surface,borderColor:speakers.has(item.participant.identity)?'#32d583':c.border,width:fullscreen?'100%':wide?'48.5%':'100%',height:fullscreen?undefined:(wide?Math.max(150,height*.5):Math.min(310,width*.7))},fullscreen&&s.fullTile]}>
-    {item.track?<VideoTrack trackRef={item.track} style={StyleSheet.absoluteFill} objectFit={item.track.source===Track.Source.ScreenShare?(fullscreen?fitMode:'contain'):'cover'}/>:<Avatar profile={participantProfile(item.participant)}/>}
-    <View style={s.tileCaption}><Ionicons name={item.participant.isMicrophoneEnabled?'mic':'mic-off'} size={16} color="white"/><Text numberOfLines={1} style={s.tileName}>{item.participant.name||'Participante'}{item.participant===room.localParticipant?' (você)':''}{raised.has(item.participant.identity)?' · ✋':''}</Text>{fullscreen&&item.track?.source===Track.Source.ScreenShare&&<Pressable accessibilityRole="button" accessibilityLabel={fitMode==='contain'?'Preencher a tela':'Mostrar a tela inteira'} onPress={()=>setFitMode(value=>value==='contain'?'cover':'contain')}><Ionicons name={fitMode==='contain'?'scan-outline':'contract-outline'} color="white" size={25}/></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={fullscreen?'Sair da tela cheia':'Ampliar transmissão'} onPress={()=>setFocused(fullscreen?null:item.key)}><Ionicons name={fullscreen?'contract-outline':'expand-outline'} color="white" size={25}/></Pressable></View>
+    {item.track?<VideoTrack trackRef={item.track} style={[StyleSheet.absoluteFill,fullscreen&&zoom!==1&&{transform:[{scale:zoom}]}]} objectFit={item.track.source===Track.Source.ScreenShare?(fullscreen?fitMode:'contain'):'cover'}/>:<Avatar profile={participantProfile(item.participant)}/>}
+    <View style={s.tileCaption}><Ionicons name={item.participant.isMicrophoneEnabled?'mic':'mic-off'} size={16} color="white"/><Text numberOfLines={1} style={s.tileName}>{item.participant.name||'Participante'}{item.participant===room.localParticipant?' (você)':''}{raised.has(item.participant.identity)?' · ✋':''}</Text>{fullscreen&&item.track?.source===Track.Source.ScreenShare&&<Pressable accessibilityRole="button" accessibilityLabel={fitMode==='contain'?'Preencher a tela':'Mostrar a tela inteira'} onPress={()=>setFitMode(value=>value==='contain'?'cover':'contain')}><Ionicons name={fitMode==='contain'?'scan-outline':'contract-outline'} color="white" size={25}/></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={fullscreen?'Sair da tela cheia':'Ampliar transmissão'} onPress={()=>fullscreen?closeViewer():openViewer(item.key)}><Ionicons name={fullscreen?'contract-outline':'expand-outline'} color="white" size={25}/></Pressable></View>
   </View>;
   const connectionText=!connected?(connection==='reconnecting'?'Reconectando…':'Conectando…'):({excellent:'Conexão ótima',good:'Conexão boa',poor:'Conexão instável',lost:'Conexão perdida'} as Record<string,string>)[quality]||'Conectado';
   return <View style={s.root}><StatusBar hidden={focused!==null} style="light"/>
@@ -326,13 +356,33 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
       ] as [Glyph,string,()=>void,boolean][]).map(([icon,label,onPress,disabled])=><Pressable key={label.split(' ')[0]} accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[s.primaryControl,{opacity:disabled?.4:1}]}><View style={[s.controlIcon,{backgroundColor:label==='Sair'?'#bd314c':c.bg}]}><Ionicons name={icon} size={22} color={label==='Sair'?'white':c.text}/></View><Text numberOfLines={1} style={{color:c.text,fontSize:10}}>{label}</Text></Pressable>)}
     </View>
     <Modal visible={toolsOpen} animationType="slide" onRequestClose={()=>setToolsOpen(false)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><ScrollView contentContainerStyle={s.page}><Text style={[s.title,{color:c.text}]}>Na sua reunião</Text>
-      <Button label={room.localParticipant.isScreenShareEnabled?'Parar apresentação':'Compartilhar tela'} icon="easel" disabled={busy||!connected} onPress={()=>{setToolsOpen(false);void act(screenShare)}}/>
+      <Button label={room.localParticipant.isScreenShareEnabled?'Parar apresentação':'Compartilhar tela'} icon="easel" disabled={busy||!connected} onPress={()=>{setToolsOpen(false);if(room.localParticipant.isScreenShareEnabled)void act(()=>room.localParticipant.setScreenShareEnabled(false));else setShareSettingsOpen(true)}}/>
       <Button label={raised.has(room.localParticipant.identity)?'Baixar mão':'Levantar mão'} icon="hand-left" disabled={busy||!connected} onPress={()=>void act(hand)}/>
       <Button label="Saída de áudio" icon="volume-high" disabled={busy||!connected} onPress={()=>{setToolsOpen(false);void act(selectOutput)}}/>
       {room.localParticipant.isCameraEnabled&&<Button label="Inverter câmera" icon="camera-reverse" disabled={busy} onPress={()=>void act(switchCamera)}/>}
       <Text style={[s.subtitle,{color:c.text}]}>Tema</Text><ThemeChoices value={theme} onChange={setTheme}/><Button label="Voltar à reunião" icon="arrow-back-circle" onPress={()=>setToolsOpen(false)}/>
     </ScrollView></SafeAreaView></Modal>
-    <Modal visible={focused!==null} animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={()=>setFocused(null)} supportedOrientations={['portrait','landscape']}><View style={[s.root,{backgroundColor:'#000'}]}>{tiles.find(t=>t.key===focused)?tile(tiles.find(t=>t.key===focused)!,true):<Text style={{color:'white',padding:24}}>A transmissão terminou.</Text>}</View></Modal>
+    <Modal visible={shareSettingsOpen} animationType="slide" onRequestClose={()=>setShareSettingsOpen(false)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><ScrollView contentContainerStyle={s.page}>
+      <Text style={[s.title,{color:c.text}]}>Qualidade da transmissão</Text>
+      <Text style={{color:c.muted}}>O aparelho e a conexão podem adaptar a qualidade quando o formato escolhido não estiver disponível.</Text>
+      <Text style={[s.subtitle,{color:c.text}]}>Resolução</Text><View style={s.choiceGrid}>{SHARE_RESOLUTIONS.map(value=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:shareResolution===value}} onPress={()=>setShareResolution(value)} style={[s.choice,{borderColor:shareResolution===value?c.accent:c.border,backgroundColor:shareResolution===value?c.accent+'22':c.surface}]}><Text style={{color:c.text,fontWeight:'700'}}>{value==='source'?'Source':value+'p'}</Text></Pressable>)}</View>
+      <Text style={[s.subtitle,{color:c.text}]}>Quadros por segundo</Text><View style={s.choiceGrid}>{SHARE_FPS.map(value=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:shareFps===value}} onPress={()=>setShareFps(value)} style={[s.choice,{borderColor:shareFps===value?c.accent:c.border,backgroundColor:shareFps===value?c.accent+'22':c.surface}]}><Text style={{color:c.text,fontWeight:'700'}}>{value} FPS</Text></Pressable>)}</View>
+      <Button label="Iniciar transmissão" icon="easel" disabled={busy||!connected} onPress={()=>void act(startScreenShare)}/><Button label="Cancelar" icon="close" onPress={()=>setShareSettingsOpen(false)}/>
+    </ScrollView></SafeAreaView></Modal>
+    <Modal visible={focused!==null} animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={closeViewer} supportedOrientations={['portrait','landscape']}><SafeAreaView style={[s.root,{backgroundColor:'#000'}]}>
+      <View style={s.viewerToolbar}>
+        <Pressable accessibilityRole="button" accessibilityState={{selected:viewerMode==='screen'}} accessibilityLabel="Somente transmissão" onPress={()=>setViewerMode('screen')} style={s.viewerAction}><Ionicons name="easel" color="white" size={22}/><Text style={s.viewerActionText}>Tela</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{selected:viewerMode==='chat'}} accessibilityLabel="Transmissão com chat" onPress={()=>setViewerMode('chat')} style={s.viewerAction}><Ionicons name="chatbubbles" color="white" size={22}/><Text style={s.viewerActionText}>Tela + chat</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Diminuir zoom" disabled={zoom<=1} onPress={()=>setZoom(value=>Math.max(1,Math.round((value-.25)*100)/100))} style={[s.viewerAction,{opacity:zoom<=1?.35:1}]}><Ionicons name="remove" color="white" size={24}/></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Restaurar zoom" onPress={()=>setZoom(1)} style={s.viewerAction}><Text style={s.viewerActionText}>{Math.round(zoom*100)}%</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Aumentar zoom" disabled={zoom>=3} onPress={()=>setZoom(value=>Math.min(3,Math.round((value+.25)*100)/100))} style={[s.viewerAction,{opacity:zoom>=3?.35:1}]}><Ionicons name="add" color="white" size={24}/></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Sair da tela cheia" onPress={closeViewer} style={s.viewerAction}><Ionicons name="close" color="white" size={25}/></Pressable>
+      </View>
+      <View style={[s.viewerBody,{flexDirection:wide?'row':'column'}]}>
+        <View style={s.viewerStage}>{tiles.find(t=>t.key===focused)?tile(tiles.find(t=>t.key===focused)!,true):<Text style={{color:'white',padding:24}}>A transmissão terminou.</Text>}</View>
+        {viewerMode==='chat'&&<KeyboardAvoidingView style={[s.viewerChat,{backgroundColor:c.bg}]} behavior={Platform.OS==='ios'?'padding':'height'}><ScrollView contentContainerStyle={s.viewerMessages} keyboardShouldPersistTaps="handled">{messages.length===0&&<Text style={{color:c.muted}}>As mensagens aparecem aqui durante a reunião.</Text>}{messages.map(m=><View key={m.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.accent,fontWeight:'700'}}>{m.name}</Text><Text selectable style={{color:c.text}}>{m.text}</Text></View>)}</ScrollView><View style={s.viewerComposer}><TextInput accessibilityLabel="Mensagem no modo imersivo" placeholder="Escreva uma mensagem" placeholderTextColor={c.muted} value={draft} onChangeText={setDraft} maxLength={500} style={[s.input,{color:c.text,borderColor:c.border,flex:1}]} onSubmitEditing={()=>void act(send)}/><Pressable accessibilityRole="button" accessibilityLabel="Enviar mensagem" disabled={busy||!draft.trim()||!connected} onPress={()=>void act(send)} style={[s.viewerSend,{backgroundColor:c.accent,opacity:busy||!draft.trim()||!connected?.4:1}]}><Ionicons name="send" color="white" size={21}/></Pressable></View></KeyboardAvoidingView>}
+      </View>
+    </SafeAreaView></Modal>
     <Modal visible={audioOutputs!==null} onRequestClose={()=>setAudioOutputs(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><View style={s.section}><Text style={[s.title,{color:c.text}]}>Saída de áudio</Text>{audioOutputs?.map(output=><Button key={output} label={({speaker:'Alto-falante',earpiece:'Fone do aparelho',bluetooth:'Bluetooth',headset:'Fone de ouvido'} as Record<string,string>)[output]||output} icon="volume-high" disabled={busy} onPress={()=>void act(async()=>{await AudioSession.selectAudioOutput(output);setAudioOutputs(null)})}/>)}<Button label="Voltar" icon="arrow-back" onPress={()=>setAudioOutputs(null)}/></View></SafeAreaView></Modal>
     <Modal visible={panel!==null} animationType="slide" onRequestClose={()=>setPanel(null)}><SafeAreaView style={[s.root,{backgroundColor:c.bg}]}><KeyboardAvoidingView style={s.root} behavior={Platform.OS==='ios'?'padding':'height'}><View style={s.meetingHeader}><Text style={[s.brand,{color:c.text,flex:1}]}>{panel==='chat'?'Chat da reunião':'Participantes'}</Text><Button label="Fechar" icon="close" onPress={()=>setPanel(null)}/></View>
       {panel==='chat'?<><ScrollView contentContainerStyle={s.section} keyboardShouldPersistTaps="handled">{messages.length===0&&<Text style={{color:c.muted}}>As mensagens aparecem aqui durante a reunião.</Text>}{messages.map(m=><View key={m.id} style={[s.bubble,{backgroundColor:c.surface}]}><Text style={{color:c.accent,fontWeight:'700'}}>{m.name}</Text><Text selectable style={{color:c.text}}>{m.text}</Text></View>)}</ScrollView><View style={s.composer}><TextInput accessibilityLabel="Mensagem" placeholder="Escreva uma mensagem" placeholderTextColor={c.muted} value={draft} onChangeText={setDraft} maxLength={500} style={[s.input,{color:c.text,borderColor:c.border,flex:1}]} onSubmitEditing={()=>void act(send)}/><Button label="Enviar" icon="send" disabled={busy||!draft.trim()||!connected} onPress={()=>void act(send)}/></View></>:<ScrollView contentContainerStyle={s.section}>
@@ -345,5 +395,5 @@ function Meeting({auth,onLeave,theme,setTheme}:{auth:Auth;onLeave:()=>void;theme
   </View>;
 }
 const s=StyleSheet.create({
-  root:{flex:1},page:{padding:20,gap:20,paddingBottom:32,width:'100%',maxWidth:780,alignSelf:'center'},header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},brand:{fontSize:21,fontWeight:'800'},title:{fontSize:30,fontWeight:'800',lineHeight:36},subtitle:{fontSize:20,fontWeight:'700'},section:{padding:18,gap:16},row:{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},profile:{borderWidth:1,borderRadius:24,padding:22,gap:16,alignItems:'center'},avatar:{backgroundColor:'#308ee3',alignItems:'center',justifyContent:'center'},input:{borderWidth:1,borderRadius:14,padding:16,fontSize:17,minHeight:54,width:'100%'},button:{minHeight:48,padding:12,borderRadius:14,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},buttonText:{fontSize:13,fontWeight:'600'},setting:{flexDirection:'row',alignItems:'center',gap:12,minHeight:48},checks:{gap:9,padding:14,borderRadius:18},deviceCheck:{minHeight:58,padding:12,borderWidth:1,borderRadius:14,flexDirection:'row',alignItems:'center',gap:11},checkDot:{width:10,height:10,borderRadius:5},error:{color:'#e15a6b',padding:14},meetingHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',padding:16,borderBottomWidth:1,gap:10},grid:{padding:12,gap:12},primaryControls:{flexDirection:'row',padding:8,gap:4,borderTopWidth:1},primaryControl:{flex:1,alignItems:'center',gap:5,minWidth:0},controlIcon:{width:40,height:40,borderRadius:15,alignItems:'center',justifyContent:'center'},tile:{borderWidth:2,height:260,backgroundColor:'#182235',borderRadius:18,overflow:'hidden',alignItems:'center',justifyContent:'center'},fullTile:{flex:1,height:undefined,borderRadius:0},tileCaption:{position:'absolute',bottom:0,left:0,right:0,backgroundColor:'#000a',padding:12,flexDirection:'row',alignItems:'center',gap:8},tileName:{color:'white',flex:1},controls:{padding:10,paddingBottom:16,flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8,borderTopWidth:1},bubble:{padding:16,borderRadius:16,gap:12},composer:{padding:10,flexDirection:'row',alignItems:'center',gap:8}
+  root:{flex:1},page:{padding:20,gap:20,paddingBottom:32,width:'100%',maxWidth:780,alignSelf:'center'},header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},brand:{fontSize:21,fontWeight:'800'},title:{fontSize:30,fontWeight:'800',lineHeight:36},subtitle:{fontSize:20,fontWeight:'700'},section:{padding:18,gap:16},row:{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'},profile:{borderWidth:1,borderRadius:24,padding:22,gap:16,alignItems:'center'},avatar:{backgroundColor:'#308ee3',alignItems:'center',justifyContent:'center'},input:{borderWidth:1,borderRadius:14,padding:16,fontSize:17,minHeight:54,width:'100%'},button:{minHeight:48,padding:12,borderRadius:14,borderWidth:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},buttonText:{fontSize:13,fontWeight:'600'},setting:{flexDirection:'row',alignItems:'center',gap:12,minHeight:48},checks:{gap:9,padding:14,borderRadius:18},deviceCheck:{minHeight:58,padding:12,borderWidth:1,borderRadius:14,flexDirection:'row',alignItems:'center',gap:11},checkDot:{width:10,height:10,borderRadius:5},error:{color:'#e15a6b',padding:14},meetingHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',padding:16,borderBottomWidth:1,gap:10},grid:{padding:12,gap:12},primaryControls:{flexDirection:'row',padding:8,gap:4,borderTopWidth:1},primaryControl:{flex:1,alignItems:'center',gap:5,minWidth:0},controlIcon:{width:40,height:40,borderRadius:15,alignItems:'center',justifyContent:'center'},tile:{borderWidth:2,height:260,backgroundColor:'#182235',borderRadius:18,overflow:'hidden',alignItems:'center',justifyContent:'center'},fullTile:{flex:1,height:undefined,borderRadius:0},tileCaption:{position:'absolute',bottom:0,left:0,right:0,backgroundColor:'#000a',padding:12,flexDirection:'row',alignItems:'center',gap:8},tileName:{color:'white',flex:1},choiceGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},choice:{minWidth:92,minHeight:48,paddingHorizontal:15,borderRadius:14,borderWidth:1,alignItems:'center',justifyContent:'center'},viewerToolbar:{zIndex:2,minHeight:58,paddingHorizontal:8,paddingVertical:6,backgroundColor:'#080b11ee',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,flexWrap:'wrap'},viewerAction:{minHeight:42,minWidth:42,paddingHorizontal:10,borderRadius:13,backgroundColor:'#ffffff18',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},viewerActionText:{color:'white',fontSize:12,fontWeight:'700'},viewerBody:{flex:1,minHeight:0},viewerStage:{flex:2,minWidth:0,minHeight:0,overflow:'hidden'},viewerChat:{flex:1,minWidth:280,minHeight:0,borderLeftWidth:1,borderColor:'#ffffff22'},viewerMessages:{padding:10,gap:9},viewerComposer:{padding:8,flexDirection:'row',alignItems:'center',gap:7},viewerSend:{width:48,height:48,borderRadius:14,alignItems:'center',justifyContent:'center'},controls:{padding:10,paddingBottom:16,flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8,borderTopWidth:1},bubble:{padding:16,borderRadius:16,gap:12},composer:{padding:10,flexDirection:'row',alignItems:'center',gap:8}
 });

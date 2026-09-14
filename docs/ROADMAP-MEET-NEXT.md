@@ -14,7 +14,8 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - apresentação fixada automaticamente, melhor aproveitamento da janela e volume agrupado com os controles da transmissão;
 - tela cheia da transmissão no navegador, alternativa para Safari móvel e modo paisagem no aplicativo;
 - janela flutuante (Picture-in-Picture) no navegador compatível;
-- seleção de `Source`, 1440p, 1080p, 720p, 480p ou 360p e 30, 60 ou 120 FPS para compartilhar pelo navegador/Windows;
+- seleção de `Source`, 1440p, 1080p, 720p, 480p ou 360p e 30, 60 ou 120 FPS para compartilhar pelo navegador, Windows e aplicativo móvel;
+- visualizador móvel imersivo em paisagem, com zoom de 100% a 300% e alternância entre transmissão ou transmissão + chat;
 - aceleração de hardware configurável no aplicativo Windows, aplicada após reiniciar; no navegador ela permanece sob controle do próprio navegador;
 - chat web com busca, categorias e histórico recente de emojis;
 - controles do anfitrião para bloquear novas entradas e silenciar todos;
@@ -34,7 +35,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 ### Experiência de apresentação
 
 - validar cada resolução e FPS em máquinas e conexões diferentes, com adaptação quando o dispositivo não alcançar o valor escolhido;
-- controles móveis de zoom e alternância entre transmissão, participantes e chat sem perder a tela principal;
+- validar os controles móveis de zoom e transmissão + chat em diferentes tamanhos de tela;\n- acrescentar a alternância de participantes ao visualizador imersivo;
 - testar tela cheia, paisagem e Picture-in-Picture em Android, iPhone e navegadores reais;
 - medir bitrate, perda de pacotes, uso de CPU/GPU e temperatura antes de definir padrões de qualidade.
 

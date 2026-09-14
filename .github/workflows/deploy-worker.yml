@@ -6,12 +6,11 @@ on:
       source_ref:
         description: Branch or commit to deploy
         required: true
-        default: audit/seguranca-readme-2026-09
+        default: main
   push:
     branches:
       - main
     paths:
-      - .github/workflows/deploy-worker.yml
       - worker/**
       - package.json
       - pnpm-lock.yaml
@@ -32,7 +31,7 @@ jobs:
       - name: Checkout deployment source
         uses: actions/checkout@v4
         with:
-          ref: audit/seguranca-readme-2026-09
+          ref: ${{ github.event.inputs.source_ref || github.ref }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

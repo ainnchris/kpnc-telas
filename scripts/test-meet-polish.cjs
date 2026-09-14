@@ -53,12 +53,13 @@ const root=path.resolve(__dirname,'..');
  assert.equal(await page.locator('#test-avatar-tile .name').evaluate(n=>getComputedStyle(n).color),'rgb(20, 32, 51)');
  await page.screenshot({path:path.join(root,'work','light-meeting-corrected.png')});
  await page.evaluate(()=>document.querySelector('#test-avatar-tile').remove());await page.locator('#more-toggle').click();
+ await page.locator('[data-key^="guest-a:"] .share-volume-toggle').click();
  await page.locator('[data-key^="guest-a:"] .share-volume input').fill('35');
  assert.deepEqual(await page.evaluate(()=>volumeCalls.at(-1)),{id:'guest-a',source:'screen_share_audio',value:.35});
- await page.locator('[data-key^="guest-a:"] .share-volume button').click();assert.equal(await page.evaluate(()=>volumeCalls.at(-1).value),0);
+ await page.locator('[data-key^="guest-a:"] .share-volume-panel button').click();assert.equal(await page.evaluate(()=>volumeCalls.at(-1).value),0);
  assert(await page.evaluate(()=>volumeCalls.every(c=>c.source==='screen_share_audio')));
  await page.evaluate(()=>{window.testHooks.renderAll();});assert(await page.evaluate(()=>originalTile===document.querySelector('#grid .tile')));
- await page.locator('#chat-toggle').click();await page.locator('#emoji-toggle').click();await page.locator('#emoji-panel button').first().click();assert.equal(await page.locator('#chat-input').inputValue(),'😀');
+ await page.locator('#chat-toggle').click();await page.locator('#emoji-toggle').click();await page.locator('#emoji-panel .emoji-grid button').first().click();assert.equal(await page.locator('#chat-input').inputValue(),'😀');
  await page.evaluate(()=>window.testHooks.message({name:'Teste',text:'Olá 😀 https://example.org/path?a=1. <img src=x onerror=alert(1)> javascript:alert(1) https://user:pass@example.org'}));
  assert.equal(await page.locator('.message a').count(),1);assert.equal(await page.locator('.message a').getAttribute('href'),'https://example.org/path?a=1');assert.equal(await page.locator('.message img').count(),0);
  await page.locator('#copy-link').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Link copiado.'||!!document.querySelector('.invite-fallback'));if(await page.locator('.invite-fallback').count()){assert.match(await page.locator('.invite-fallback input').inputValue(),/room=abc-def-123$/);await page.locator('.invite-fallback button').click();}

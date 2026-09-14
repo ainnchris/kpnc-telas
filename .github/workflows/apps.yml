@@ -24,7 +24,7 @@ jobs:
       - id: paths
         shell: bash
         env:
-          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           if [ "$MANUAL" = "true" ]; then

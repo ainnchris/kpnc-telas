@@ -1,0 +1,149 @@
+name: Aplicativos de teste
+on:
+  push:
+    branches: [feat/meet-multiplataforma, feat/meet-next]
+    paths: [apps/**, pnpm-lock.yaml, pnpm-workspace.yaml, .github/workflows/apps.yml]
+  pull_request:
+    branches: [main]
+    paths: [apps/**, pnpm-lock.yaml, pnpm-workspace.yaml, .github/workflows/apps.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      mobile: ${{ steps.paths.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: paths
+        shell: bash
+        env:
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$MANUAL" = "true" ]; then
+            echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          elif [[ "$BEFORE" =~ ^0+$ ]]; then
+            echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BEFORE" HEAD | grep -Eq '^(apps/mobile/|pnpm-lock.yaml|pnpm-workspace.yaml)'; then
+            echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'mobile=false' >> "$GITHUB_OUTPUT"
+          fi
+  ios-simulator:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: node node_modules/expo/bin/cli prebuild --platform ios --no-install
+        working-directory: apps/mobile
+      - run: pod install
+        working-directory: apps/mobile/ios
+      - run: xcodebuild -workspace apps/mobile/ios/KpncMeet.xcworkspace -scheme KpncMeet -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath apps/mobile/ios/build CODE_SIGNING_ALLOWED=NO
+      - run: ditto -c -k --sequesterRsrc --keepParent apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/KpncMeet.app apps/mobile/Kpnc-Meet-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kpnc-Meet-iOS-simulator-not-for-iPhone
+          path: apps/mobile/Kpnc-Meet-simulator.zip
+          if-no-files-found: error
+  windows:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - run: pnpm install --frozen-lockfile
+      - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs
+      - run: node --test scripts/test-sounds.cjs scripts/test-media-start.cjs
+      - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: node apps/desktop/node_modules/electron/install.js
+      - name: Verificar captura real e clipboard antes de publicar
+        timeout-minutes: 2
+        run: node apps/desktop/node_modules/electron/cli.js apps/desktop --media-smoke
+      - run: pnpm --filter kpnc-meet-desktop dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verificar atualizacao silenciosa e reabertura
+        timeout-minutes: 6
+        shell: pwsh
+        run: ./scripts/test-windows-upgrade.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kpnc-Meet-Windows-experimental
+          path: apps/desktop/dist/*.exe
+          if-no-files-found: error
+      - name: Publicar atualizacao Windows verificada
+        if: github.ref == 'refs/heads/feat/meet-multiplataforma'
+        run: node scripts/publish-build.cjs windows
+        env:
+          GH_TOKEN: ${{ github.token }}
+  android:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.19.0'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter kpnc-meet-mobile typecheck
+      - run: node node_modules/expo/bin/cli prebuild --platform android --no-install
+        working-directory: apps/mobile
+      - run: node scripts/check-android-permissions.cjs apps/mobile/android/app/src/main/AndroidManifest.xml
+      # Expo's generated release variant uses a debug signing key for preview only.
+      # A production upload requires a user-owned release key / Play App Signing.
+      - name: Compilar APK com memoria controlada
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8" -Dkotlin.daemon.jvm.options="-Xmx1536m -XX:MaxMetaspaceSize=768m"
+        working-directory: apps/mobile/android
+      - name: Conferir permissoes dentro do APK
+        shell: bash
+        run: |
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$AAPT" dump permissions apps/mobile/android/app/build/outputs/apk/release/app-release.apk > apk-permissions.txt
+          grep -q "android.permission.CAMERA" apk-permissions.txt
+          grep -q "android.permission.RECORD_AUDIO" apk-permissions.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kpnc-Meet-Android-experimental
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+      - name: Publicar atualizacao Android
+        if: github.ref == 'refs/heads/feat/meet-multiplataforma'
+        run: node scripts/publish-build.cjs android
+        env:
+          GH_TOKEN: ${{ github.token }}

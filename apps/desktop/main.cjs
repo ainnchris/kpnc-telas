@@ -1,0 +1,117 @@
+'use strict';
+const {app, BrowserWindow, Menu, session, dialog, desktopCapturer, ipcMain, shell, clipboard} = require('electron');
+const path = require('node:path');
+const {SITE, isMeetURL, meetingLink} = require('./policy.cjs');
+const hardware=require('./hardware-acceleration.cjs');
+if (!app.isPackaged && (process.argv.includes('--smoke-test') || process.argv.includes('--media-smoke'))) {
+  const profile = path.join(__dirname,'dist','smoke-profile');
+  require('node:fs').mkdirSync(profile,{recursive:true});
+  app.setPath('userData',profile);
+}
+let main, picker, pendingCapture;
+let permissions;
+const hardwareEnabledAtStartup=hardware.applyHardwareAcceleration(app);
+const startupLink = process.argv.map(meetingLink).find(Boolean) || SITE;
+function trusted(contents, url) {
+  return !!main && !main.isDestroyed() && contents === main.webContents && isMeetURL(url);
+}
+function finishCapture(result = {}) {
+  const pending = pendingCapture;
+  pendingCapture = null;
+  if (picker && !picker.isDestroyed()) picker.close();
+  picker = null;
+  if (pending) {
+    clearTimeout(pending.timer);
+    // A closed/navigated requesting frame must never receive an old approval.
+    try { pending.callback(trusted(main?.webContents, main?.webContents.getURL()) ? result : {}); } catch {}
+  }
+}
+async function chooseScreen(request, callback) {
+  const validFrame=!!main&&request.frame===main.webContents.mainFrame;
+  console.info('MEET_CAPTURE_REQUEST',JSON.stringify({validFrame,trustedOrigin:isMeetURL(request.securityOrigin),userGesture:request.userGesture,busy:!!pendingCapture}));
+  // The explicit local picker is the consent boundary, even after async SDK work.
+  if (!validFrame || !isMeetURL(request.securityOrigin) || pendingCapture) return callback({});
+  const pending = {callback, sources:[], timer:setTimeout(() => finishCapture(), 60000), audio:request.audioRequested};
+  pendingCapture = pending;
+  try {
+    pending.sources = await desktopCapturer.getSources({types:['screen','window'], thumbnailSize:{width:320,height:180}, fetchWindowIcons:false});
+    if (pendingCapture !== pending) return;
+    picker = new BrowserWindow({parent:main, modal:true, width:760,height:580, title:'Escolha o que compartilhar', backgroundColor:'#0b1220', autoHideMenuBar:true,
+      webPreferences:{preload:path.join(__dirname,'picker-preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+    picker.webContents.setWindowOpenHandler(() => ({action:'deny'}));
+    picker.webContents.on('will-navigate', e => e.preventDefault());
+    picker.on('closed', () => {picker = null; finishCapture();});
+    await picker.loadFile(path.join(__dirname,'picker.html'));
+    console.info('MEET_CAPTURE_PICKER_READY',pending.sources.length);
+  } catch (error) {console.warn('MEET_CAPTURE_FAILED',error?.name||'Error');finishCapture();}
+}
+ipcMain.handle('capture:list', event => {
+  if (!picker || event.sender !== picker.webContents || event.senderFrame !== picker.webContents.mainFrame || !pendingCapture) throw new Error('Forbidden');
+  return {audio:pendingCapture.audio && process.platform === 'win32',sources:pendingCapture.sources.map(s => ({id:s.id,name:s.name,thumbnail:s.thumbnail.toDataURL()}))};
+});
+ipcMain.on('capture:select', (event, selection) => {
+  if (!picker || event.sender !== picker.webContents || event.senderFrame !== picker.webContents.mainFrame || !pendingCapture) return;
+  const source = pendingCapture.sources.find(s => s.id === selection?.id);
+  if (!source) return finishCapture();
+  finishCapture({video:source,...(selection.audio === true && pendingCapture.audio && process.platform === 'win32' ? {audio:'loopback'} : {})});
+});
+function sendAction(id) { if (main && !main.isDestroyed() && isMeetURL(main.webContents.getURL())) main.webContents.send('meet:action',id); }
+async function createWindow() {
+  const smokeTest = !app.isPackaged && process.argv.includes('--smoke-test');
+  main = new BrowserWindow({show:!smokeTest,frame:false,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/icon.ico'),
+    webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:'persist:kpnc-meet'}});
+  require('./updater.cjs').setupUpdater({app,ipcMain,getMain:()=>main,shell});
+  require('./window-controls.cjs').setupWindowControls({ipcMain,getMain:()=>main,clipboard});
+  hardware.setupHardwareAcceleration({app,ipcMain,getMain:()=>main,enabledAtStartup:hardwareEnabledAtStartup});
+  for(const event of ['maximize','unmaximize','enter-full-screen','leave-full-screen'])main.on(event,()=>main.webContents.send('meet:window-state',{maximized:main.isMaximized(),fullscreen:main.isFullScreen()}));
+  const ses = session.fromPartition('persist:kpnc-meet');
+  permissions=require('./permissions.cjs').setupPermissions({ses,getMain:()=>main,BrowserWindow,ipcMain,path});
+  ses.setDisplayMediaRequestHandler(chooseScreen);
+  main.webContents.on('will-navigate',(event,url) => {if (!isMeetURL(url)) event.preventDefault(); permissions?.cancel(); finishCapture();});
+  main.webContents.on('will-redirect',(event,url) => {if (!isMeetURL(url)) event.preventDefault();});
+  main.webContents.on('will-attach-webview',event => event.preventDefault());
+  main.webContents.setWindowOpenHandler(({url}) => {
+    const target=require('./window-controls.cjs').externalURL(url);
+    if (target) void shell.openExternal(target);
+    return {action:'deny'};
+  });
+  main.webContents.on('did-fail-load',async (_event,code,_description,_url,isMainFrame) => {
+    if (!isMainFrame || code === -3 || main.isDestroyed()) return;
+    if (smokeTest) {console.error('SMOKE_LOAD_FAILED',code);app.exit(1);return;}
+    const choice = await dialog.showMessageBox(main,{type:'warning',message:'Não foi possível abrir o Kpnc Meet.',detail:'Confira a internet e tente novamente.',buttons:['Tentar novamente','Fechar'],defaultId:0});
+    if (choice.response === 0) void main.loadURL(SITE).catch(()=>{}); else main.close();
+  });
+  main.on('closed',()=>{permissions?.cancel();finishCapture();main=null;});
+  Menu.setApplicationMenu(null);
+  main.setMenu(null);
+  main.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.isAutoRepeat) return;
+    const key = input.key.toLowerCase();
+    const action = {m:'mic',v:'camera',c:'chat-toggle'}[key];
+    if (input.control && input.shift && !input.alt && action) {event.preventDefault();sendAction(action);}
+    if (key === 'f11') {event.preventDefault();main.setFullScreen(!main.isFullScreen());}
+  });
+  await main.loadURL(startupLink).catch(()=>{});
+  if (!app.isPackaged && process.argv.includes('--media-smoke')) {
+    try{await require('./smoke-media.cjs')({main,BrowserWindow,clipboard});app.exit(0);}catch(error){console.error('MEDIA_SMOKE_FAILED',error);app.exit(1);}return;
+  }
+  if (smokeTest) {
+    const result = await main.webContents.executeJavaScript(`({title:document.title,home:!!document.getElementById('new-meeting'),livekit:!!window.LivekitClient,nodeExposed:typeof require!=='undefined',chatButton:!!document.getElementById('chat-toggle')})`);
+    console.log(JSON.stringify(result));
+    app.exit(result.home && result.livekit && !result.nodeExposed && result.chatButton ? 0 : 1);
+  }
+}
+if (!app.requestSingleInstanceLock()) app.quit();
+else {
+  app.on('second-instance',async (_event,args) => {
+    if (!main) return;
+    if (main.isMinimized()) main.restore(); main.focus();
+    const target = args.map(meetingLink).find(Boolean);
+    if (target) {
+      const result = await dialog.showMessageBox(main,{type:'question',message:'Abrir outra reunião?',detail:'Isso sai da reunião atual, se houver.',buttons:['Cancelar','Abrir'],defaultId:0,cancelId:0});
+      if (result.response === 1) void main.loadURL(target).catch(()=>{});
+    }
+  });
+  app.whenReady().then(createWindow);
+  app.on('window-all-closed',()=>app.quit());
+}

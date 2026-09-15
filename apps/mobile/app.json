@@ -1,0 +1,80 @@
+{
+  "expo": {
+    "name": "Kpnc Meet",
+    "slug": "kpnc-meet",
+    "version": "0.4.0",
+    "icon": "./assets/icon.png",
+    "scheme": "kpncmeet",
+    "orientation": "default",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#07142b"
+    },
+    "ios": {
+      "bundleIdentifier": "dev.kpnc.meet",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ative sua câmera para participar das reuniões.",
+        "NSMicrophoneUsageDescription": "Ative seu microfone para conversar nas reuniões.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
+    },
+    "android": {
+      "package": "dev.kpnc.meet",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#07142b"
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "versionCode": 4,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "BLUETOOTH_CONNECT",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "FOREGROUND_SERVICE_MEDIA_PROJECTION",
+        "POST_NOTIFICATIONS",
+        "REQUEST_INSTALL_PACKAGES"
+      ]
+    },
+    "plugins": [
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication",
+            "enableScreenShareService": true
+          }
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Ative sua câmera para participar das reuniões.",
+          "microphonePermission": "Ative seu microfone para conversar nas reuniões."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Escolha uma foto para seu perfil no Kpnc Meet.",
+          "cameraPermission": "Ative sua câmera para participar das reuniões.",
+          "microphonePermission": "Ative seu microfone para conversar nas reuniões."
+        }
+      ],
+      "./plugins/with-broadcast",
+      "./plugins/with-call-service"
+    ]
+  }
+}

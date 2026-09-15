@@ -244,11 +244,17 @@ body[data-theme] dialog,
 
 .grid { scrollbar-color: rgba(128, 160, 207, .34) transparent; }
 .tile {
-  border-color: var(--meeting-border) !important;
+  border-color: var(--meeting-border);
   background:
     radial-gradient(circle at 50% 40%, rgba(68, 117, 190, .16), transparent 45%),
-    #101b2a !important;
+    #101b2a;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 12px 32px rgba(0, 0, 0, .17);
+}
+body[data-theme=dark] .tile,
+body[data-theme=gray] .tile,
+body[data-theme=black] .tile {
+  border-color: var(--meeting-border);
+  background: radial-gradient(circle at 50% 40%, rgba(68, 117, 190, .16), transparent 45%), #101b2a;
 }
 .tile video { background: #050a11; }
 .tile .name { padding: 5px 9px; border-radius: 9px; background: rgba(4, 9, 16, .68); }

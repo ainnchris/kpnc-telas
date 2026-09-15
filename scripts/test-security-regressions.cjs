@@ -22,9 +22,14 @@ assert(worker.includes("'DeleteRoom'"),'ending a room must be enforced by the se
 assert(worker.includes('chatHistory(memberHash')&&worker.includes('this.member(room, memberHash)'),'chat history must require a room-member credential');
 assert(worker.includes("throw new Error('CHAT_BLOCKED')"),'server must enforce individual chat permission');
 assert(worker.includes('room.messages = room.messages.slice(-200)'),'room chat history must stay bounded');
+assert(worker.includes('moderationHistory(adminHash')&&worker.includes('this.authorizeAdmin(adminHash)'),'moderation history must require an administrator credential');
+assert(worker.includes('room.moderation = room.moderation.slice(-100)'),'moderation history must stay bounded');
+assert(worker.includes("recordParticipantAction(await sha256(bearer(request)), action, identity)"),'successful LiveKit moderation actions must be recorded by the server');
 assert(web.includes('replyId=state.replyTo?.id')&&mobile.includes("replyId:replyTo?.id||''"),'replies must reference server-side message IDs');
 assert(web.includes('Transferir a função de anfitrião')&&mobile.includes('Transferir anfitrião'),'host transfer must require an explicit user action');
 assert(web.includes('state.memberKey')&&mobile.includes('memberKey=auth.memberKey'),'clients must poll their own role without sharing the original host key');
+assert(web.toLocaleLowerCase('pt-BR').includes('atividade da moderação')&&mobile.includes('Atividade da moderação'),'administrators must see moderation history on web and mobile');
+assert(web.includes("confirm(next?'Bloquear a reunião")&&mobile.includes("Alert.alert(locked?'Permitir novas entradas?"),'room locking must require confirmation');
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');
 assert.match(headers,/Content-Security-Policy:/,'published site must define a CSP');
 assert.match(headers,/frame-ancestors 'none'/,'published site must block framing');

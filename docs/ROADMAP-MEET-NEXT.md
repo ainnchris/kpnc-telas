@@ -28,6 +28,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - confirmações e estados de andamento/resultado para as ações administrativas, estado de bloqueio sincronizado e histórico de moderação limitado, protegido e disponível para anfitrião e coanfitriões no navegador e no aplicativo.
 - alternância acessível entre câmeras, apresentações e participantes dentro do visualizador móvel imersivo, com recuperação automática quando a transmissão selecionada termina.
 - atualizador do Windows com progresso por etapa, retomada segura de downloads interrompidos, reaproveitamento de instalador verificado e recuperação amigável de falhas; a assinatura definitiva continua pendente.
+- arquitetura e limites da criptografia ponta a ponta opcional definidos em `docs/E2EE-DESIGN.md`, incluindo ciclo de chaves, falha fechada, separação entre mídia e chat e critérios de testes cruzados; o recurso permanece desativado até a implementação e validação completas.
 
 ## Próximas etapas
 
@@ -55,7 +56,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 ### Segurança e interface
 
-- estudar criptografia ponta a ponta opcional com gerenciamento e verificação de chaves; não anunciar E2EE antes da validação entre todos os clientes;
+- implementar a criptografia ponta a ponta opcional conforme `docs/E2EE-DESIGN.md` e validá-la entre todos os clientes antes de anunciá-la;
 - revisão visual conjunta com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, mantendo contraste, desempenho, movimento reduzido e acessibilidade;
 - auditoria de segurança e privacidade antes de promover a branch para `main`.
 

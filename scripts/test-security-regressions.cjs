@@ -8,6 +8,8 @@ const web=fs.readFileSync(path.join(root,'public/js/app.js'),'utf8');
 const mobile=fs.readFileSync(path.join(root,'apps/mobile/src/App.tsx'),'utf8');
 const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
 const headers=fs.readFileSync(path.join(root,'public/_headers'),'utf8');
+const readme=fs.readFileSync(path.join(root,'README.md'),'utf8');
+const e2eeDesign=fs.readFileSync(path.join(root,'docs/E2EE-DESIGN.md'),'utf8');
 
 assert(worker.includes('clean(bearer(request), 128)'),'admission secret must prefer the Authorization header');
 assert(!web.includes('&secret='),'web client must not put admission secrets in URLs');
@@ -33,5 +35,10 @@ assert(web.includes("confirm(next?'Bloquear a reunião")&&mobile.includes("Alert
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');
 assert.match(headers,/Content-Security-Policy:/,'published site must define a CSP');
 assert.match(headers,/frame-ancestors 'none'/,'published site must block framing');
+assert(readme.includes('não anuncia criptografia de ponta a ponta verificável'),'documentation must not claim that E2EE is available before cross-client validation');
+assert(!html.toLocaleLowerCase('pt-BR').includes('criptografia ponta a ponta'),'public UI must not advertise unfinished E2EE');
+assert(e2eeDesign.includes('A chave da reunião não poderá ser enviada ao Worker'),'E2EE design must keep media keys outside the server');
+assert(e2eeDesign.includes('o chat não poderá ser apresentado como E2EE'),'E2EE design must distinguish server-side chat from encrypted media');
+assert(e2eeDesign.includes('jamais recua silenciosamente'),'E2EE must fail closed instead of downgrading silently');
 
-console.log('PASS: admission secrets, scoped moderator credentials, enforced participant permissions, SRI and security headers');
+console.log('PASS: admission secrets, scoped moderator credentials, enforced permissions, E2EE claims, SRI and security headers');

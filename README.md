@@ -92,11 +92,11 @@ O deploy usa `--keep-vars` para preservar a configuração existente. O frontend
 - downloads do atualizador Windows exigem origem conhecida e SHA-256 correspondente;
 - o site define Content Security Policy, bloqueio de frames e políticas restritivas de navegador;
 - mensagens, links e nomes são renderizados sem interpretar HTML fornecido por participantes;
-- chat e gravações não são persistidos pela aplicação; gravações são geradas no dispositivo do usuário;
+- o histórico do chat é limitado à duração da sala e gravações são geradas somente no dispositivo do usuário;
 - perfil e preferências ficam no armazenamento local do navegador ou aplicativo;
 - salas expiram automaticamente após 12 horas e solicitações de entrada após 15 minutos.
 
-O Kpnc Meet protege o tráfego em trânsito, mas não anuncia criptografia de ponta a ponta verificável. O LiveKit Cloud e os serviços de infraestrutura continuam fazendo parte do caminho de comunicação.
+O Kpnc Meet protege o tráfego em trânsito, mas não anuncia criptografia de ponta a ponta verificável. O LiveKit Cloud e os serviços de infraestrutura continuam fazendo parte do caminho de comunicação. A arquitetura proposta e seus critérios de ativação estão em [`docs/E2EE-DESIGN.md`](docs/E2EE-DESIGN.md).
 
 Para operação pública, recomenda-se configurar limitação de tráfego no Cloudflare, monitorar erros e custos, assinar comercialmente os instaladores e manter os segredos fora de logs e mensagens.
 

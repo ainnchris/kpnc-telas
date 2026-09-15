@@ -107,7 +107,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -127,7 +127,8 @@ jobs:
       - run: node scripts/check-android-permissions.cjs apps/mobile/android/app/src/main/AndroidManifest.xml
       # Expo's generated release variant uses a debug signing key for preview only.
       # A production upload requires a user-owned release key / Play App Signing.
-      - run: ./gradlew assembleRelease --no-daemon
+      - name: Compilar APK com memoria controlada
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8" -Dkotlin.daemon.jvm.options="-Xmx1536m -XX:MaxMetaspaceSize=768m"
         working-directory: apps/mobile/android
       - name: Conferir permissoes dentro do APK
         shell: bash

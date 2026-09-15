@@ -97,7 +97,7 @@ O deploy usa `--keep-vars` para preservar a configuração existente. O frontend
 - perfil e preferências ficam no armazenamento local do navegador ou aplicativo;
 - salas expiram automaticamente após 12 horas e solicitações de entrada após 15 minutos.
 
-O Kpnc Meet protege o tráfego em trânsito, mas não anuncia criptografia de ponta a ponta verificável. O LiveKit Cloud e os serviços de infraestrutura continuam fazendo parte do caminho de comunicação. A arquitetura proposta e seus critérios de ativação estão em [`docs/E2EE-DESIGN.md`](docs/E2EE-DESIGN.md).
+O Kpnc Meet público estável protege o tráfego em trânsito, mas não anuncia criptografia de ponta a ponta verificável. Na branch `feat/meet-next`, existe um modo experimental de E2EE para áudio, câmera e compartilhamento de tela; a chave fica somente na memória dos clientes e nunca segue para a API. O chat, a admissão e a moderação continuam protegidos em trânsito, mas não são E2EE. A implementação, seus limites e os testes reais ainda obrigatórios estão em [`docs/E2EE-DESIGN.md`](docs/E2EE-DESIGN.md).
 
 Para operação pública, recomenda-se configurar limitação de tráfego no Cloudflare, monitorar erros e custos, assinar comercialmente os instaladores e manter os segredos fora de logs e mensagens.
 

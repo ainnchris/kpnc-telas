@@ -35,8 +35,8 @@ assert(web.includes("confirm(next?'Bloquear a reunião")&&mobile.includes("Alert
 assert.match(html,/integrity="sha384-[A-Za-z0-9+/=]+"/,'third-party runtime must use SRI');
 assert.match(headers,/Content-Security-Policy:/,'published site must define a CSP');
 assert.match(headers,/frame-ancestors 'none'/,'published site must block framing');
-assert(readme.includes('não anuncia criptografia de ponta a ponta verificável'),'documentation must not claim that E2EE is available before cross-client validation');
-assert(!html.toLocaleLowerCase('pt-BR').includes('criptografia ponta a ponta'),'public UI must not advertise unfinished E2EE');
+assert(readme.includes('não anuncia criptografia de ponta a ponta verificável'),'documentation must not claim verified E2EE before cross-client validation');
+assert(html.includes('Mídia com E2EE')&&html.includes('experimental')&&html.includes('O chat continua protegido em trânsito'),'experimental UI must distinguish media E2EE from server-side chat');
 assert(e2eeDesign.includes('A chave da reunião não poderá ser enviada ao Worker'),'E2EE design must keep media keys outside the server');
 assert(e2eeDesign.includes('o chat não poderá ser apresentado como E2EE'),'E2EE design must distinguish server-side chat from encrypted media');
 assert(e2eeDesign.includes('jamais recua silenciosamente'),'E2EE must fail closed instead of downgrading silently');

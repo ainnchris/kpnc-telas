@@ -15,14 +15,14 @@ type MemberState = { secretHash: string; role: Exclude<MemberRole, 'host'>; perm
 type ChatMessage = { id: string; identity: string; name: string; text: string; replyTo?: { id: string; name: string; text: string }; createdAt: number };
 type ModerationAction = 'admit' | 'deny' | 'lock' | 'unlock' | 'mute' | 'remove' | 'promote_cohost' | 'demote_cohost' | 'transfer_host' | 'permissions' | 'end_room';
 type ModerationEvent = { id: string; action: ModerationAction; actorIdentity: string; actorRole: 'host' | 'cohost'; targetIdentity?: string; targetName?: string; changes?: Partial<MemberPermissions>; createdAt: number };
-type RoomState = { hostHash: string; hostIdentity: string; createdAt: number; closed: boolean; locked: boolean; requests: Record<string, JoinRequest>; members: Record<string, MemberState>; messages: ChatMessage[]; moderation: ModerationEvent[] };
+type RoomState = { hostHash: string; hostIdentity: string; createdAt: number; closed: boolean; locked: boolean; e2ee: boolean; requests: Record<string, JoinRequest>; members: Record<string, MemberState>; messages: ChatMessage[]; moderation: ModerationEvent[] };
 const DEFAULT_PERMISSIONS: MemberPermissions = { microphone: true, camera: true, chat: true, screen: true };
 
 export class RoomCoordinator extends DurableObject<Env> {
-  async create(hostHash: string, hostIdentity: string): Promise<boolean> {
+  async create(hostHash: string, hostIdentity: string, e2ee: boolean): Promise<boolean> {
     const current = await this.ctx.storage.get<RoomState>('room');
     if (current && !current.closed && Date.now() - current.createdAt < ROOM_TTL_MS) return false;
-    await this.ctx.storage.put('room', { hostHash, hostIdentity, createdAt: Date.now(), closed: false, locked: false, requests: {}, members: {}, messages: [], moderation: [] } satisfies RoomState);
+    await this.ctx.storage.put('room', { hostHash, hostIdentity, createdAt: Date.now(), closed: false, locked: false, e2ee, requests: {}, members: {}, messages: [], moderation: [] } satisfies RoomState);
     await this.ctx.storage.setAlarm(Date.now() + ROOM_TTL_MS);
     return true;
   }
@@ -30,9 +30,11 @@ export class RoomCoordinator extends DurableObject<Env> {
     const room = await this.ctx.storage.get<RoomState>('room');
     return !!room && !room.closed && Date.now() - room.createdAt < ROOM_TTL_MS;
   }
-  async requestJoin(request: JoinRequest): Promise<'created' | 'missing' | 'full' | 'locked'> {
+  async requestJoin(request: JoinRequest, e2ee: boolean): Promise<'created' | 'missing' | 'full' | 'locked' | 'mode_mismatch'> {
     const room = await this.ctx.storage.get<RoomState>('room');
     if (!room || room.closed || Date.now() - room.createdAt >= ROOM_TTL_MS) return 'missing';
+    this.normalize(room);
+    if (room.e2ee !== e2ee) return 'mode_mismatch';
     if (room.locked) return 'locked';
     this.prune(room);
     if (Object.keys(room.requests).length >= MAX_REQUESTS_PER_ROOM) return 'full';
@@ -40,7 +42,7 @@ export class RoomCoordinator extends DurableObject<Env> {
     await this.ctx.storage.put('room', room);
     return 'created';
   }
-  async requestStatus(id: string, secretHash: string): Promise<{ status: JoinStatus; name: string; avatar: string; identity?: string } | null> {
+  async requestStatus(id: string, secretHash: string): Promise<{ status: JoinStatus; name: string; avatar: string; identity?: string; e2ee: boolean } | null> {
     const room = await this.ctx.storage.get<RoomState>('room');
     const item = room?.requests[id];
     if (!room || room.closed || !item || !secureEqual(item.secretHash, secretHash) || Date.now() - item.createdAt >= REQUEST_TTL_MS) return null;
@@ -50,7 +52,7 @@ export class RoomCoordinator extends DurableObject<Env> {
       room.members[item.identity] = { secretHash: item.secretHash, role: 'participant', permissions: { ...DEFAULT_PERMISSIONS } };
       await this.ctx.storage.put('room', room);
     }
-    return { status: item.status, name: item.name, avatar: item.avatar, identity: item.identity };
+    return { status: item.status, name: item.name, avatar: item.avatar, identity: item.identity, e2ee: room.e2ee };
   }
   async pending(adminHash: string): Promise<Array<{ id: string; name: string; createdAt: number }>> {
     const room = await this.authorizeAdmin(adminHash);
@@ -150,7 +152,7 @@ export class RoomCoordinator extends DurableObject<Env> {
     throw new Error('UNAUTHORIZED');
   }
   private async authorize(hostHash: string): Promise<RoomState> { return this.authorizeHost(hostHash); }
-  private normalize(room: RoomState): void { room.members ||= {}; room.messages ||= []; room.moderation ||= []; room.hostIdentity ||= 'host-legacy'; }
+  private normalize(room: RoomState): void { room.members ||= {}; room.messages ||= []; room.moderation ||= []; room.hostIdentity ||= 'host-legacy'; room.e2ee ??= false; }
   private record(room: RoomState, adminHash: string, action: ModerationAction, targetIdentity?: string, targetName?: string, changes?: Partial<MemberPermissions>): void {
     this.normalize(room); let actorIdentity = room.hostIdentity; let actorRole: 'host' | 'cohost' = 'host';
     if (!secureEqual(room.hostHash, adminHash)) for (const [identity, member] of Object.entries(room.members)) if (member.role === 'cohost' && secureEqual(member.secretHash, adminHash)) { actorIdentity = identity; actorRole = 'cohost'; break; }
@@ -219,20 +221,21 @@ export default {
     if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, rooms: true }, 200, origin);
     try {
       if (request.method === 'POST' && url.pathname === '/api/rooms') {
-        const body = await readBody(request); const name = clean(body.name, 48); const avatar = cleanAvatar(body.avatar);
+        const body = await readBody(request); const name = clean(body.name, 48); const avatar = cleanAvatar(body.avatar); const e2ee = body.e2ee === true;
         if (name.length < 2) return json({ error: 'Informe um nome com pelo menos 2 caracteres.' }, 400, origin);
         let room = ''; let hostKey = ''; const hostIdentity = `host-${crypto.randomUUID()}`;
-        for (let attempt = 0; attempt < 5; attempt += 1) { room = roomCode(); hostKey = randomToken(); if (await coordinator(env, room).create(await sha256(hostKey), hostIdentity)) break; room = ''; }
+        for (let attempt = 0; attempt < 5; attempt += 1) { room = roomCode(); hostKey = randomToken(); if (await coordinator(env, room).create(await sha256(hostKey), hostIdentity, e2ee)) break; room = ''; }
         if (!room) throw new Error('ROOM_CREATE_FAILED');
-        return json({ token: await issueToken(env, room, name, true, avatar, hostIdentity), url: env.LIVEKIT_URL, room, host: true, hostKey, memberKey: hostKey }, 201, origin);
+        return json({ token: await issueToken(env, room, name, true, avatar, hostIdentity), url: env.LIVEKIT_URL, room, host: true, hostKey, memberKey: hostKey, e2ee }, 201, origin);
       }
       if (request.method === 'POST' && url.pathname === '/api/join-requests') {
-        const body = await readBody(request); const name = clean(body.name, 48); const avatar = cleanAvatar(body.avatar); const room = clean(body.room, 64).toLowerCase();
+        const body = await readBody(request); const name = clean(body.name, 48); const avatar = cleanAvatar(body.avatar); const room = clean(body.room, 64).toLowerCase(); const e2ee = body.e2ee === true;
         if (name.length < 2 || !/^[a-z0-9-]{6,64}$/.test(room)) return json({ error: 'Nome ou código inválido.' }, 400, origin);
         const id = crypto.randomUUID(); const secret = randomToken();
-        const result = await coordinator(env, room).requestJoin({ id, name, avatar, secretHash: await sha256(secret), status: 'waiting', createdAt: Date.now() });
+        const result = await coordinator(env, room).requestJoin({ id, name, avatar, secretHash: await sha256(secret), status: 'waiting', createdAt: Date.now() }, e2ee);
         if (result === 'missing') return json({ error: 'Esta reunião não existe ou já foi encerrada.', code: 'ROOM_NOT_FOUND' }, 404, origin);
         if (result === 'locked') return json({ error: 'Esta reunião está bloqueada para novas entradas.', code: 'ROOM_LOCKED' }, 423, origin);
+        if (result === 'mode_mismatch') return json({ error: e2ee ? 'Esta reunião não usa criptografia ponta a ponta. Desative a opção para entrar.' : 'Esta reunião exige criptografia ponta a ponta. Ative a opção e informe a chave.', code: 'E2EE_MODE_MISMATCH' }, 409, origin);
         if (result === 'full') return json({ error: 'A sala de espera está cheia. Tente novamente em alguns minutos.', code: 'WAITING_ROOM_FULL' }, 429, origin);
         return json({ room, requestId: id, requestSecret: secret, status: 'waiting' }, 202, origin);
       }
@@ -245,7 +248,7 @@ export default {
         const status = await coordinator(env, room).requestStatus(statusMatch[1], await sha256(secret));
         if (!status) return json({ error: 'Solicitação expirada ou reunião encerrada.', code: 'REQUEST_EXPIRED' }, 404, origin);
         if (status.status !== 'approved') return json({ status: status.status }, 200, origin);
-        return json({ status: 'approved', token: await issueToken(env, room, status.name, false, status.avatar, status.identity), url: env.LIVEKIT_URL, room, host: false, memberKey: secret }, 200, origin);
+        return json({ status: 'approved', token: await issueToken(env, room, status.name, false, status.avatar, status.identity), url: env.LIVEKIT_URL, room, host: false, memberKey: secret, e2ee: status.e2ee }, 200, origin);
       }
       const messagesMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/messages$/i);
       if (request.method === 'GET' && messagesMatch) return json({ messages: await coordinator(env, messagesMatch[1]).chatHistory(await sha256(bearer(request))) }, 200, origin);

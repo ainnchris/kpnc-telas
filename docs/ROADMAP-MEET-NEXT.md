@@ -28,7 +28,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - confirmações e estados de andamento/resultado para as ações administrativas, estado de bloqueio sincronizado e histórico de moderação limitado, protegido e disponível para anfitrião e coanfitriões no navegador e no aplicativo.
 - alternância acessível entre câmeras, apresentações e participantes dentro do visualizador móvel imersivo, com recuperação automática quando a transmissão selecionada termina.
 - atualizador do Windows com progresso por etapa, retomada segura de downloads interrompidos, reaproveitamento de instalador verificado e recuperação amigável de falhas; a assinatura definitiva continua pendente.
-- arquitetura e limites da criptografia ponta a ponta opcional definidos em `docs/E2EE-DESIGN.md`, incluindo ciclo de chaves, falha fechada, separação entre mídia e chat e critérios de testes cruzados; o recurso permanece desativado até a implementação e validação completas.
+- E2EE opcional de mídia implementada de forma experimental no navegador, Windows, Android e iOS: chave aleatória somente em memória, impressão local, negociação de modo no Worker, worker web com SHA-256 fixado, provedor nativo e falha fechada; chat, admissão e moderação continuam explicitamente fora da E2EE.
 - sistema visual unificado entre web, Windows e aplicativo móvel com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, incluindo fallbacks opacos, movimento reduzido, contraste e controles responsivos; especificação em `docs/VISUAL-SYSTEM.md`.
 
 ## Próximas etapas
@@ -57,7 +57,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 ### Segurança e interface
 
-- implementar a criptografia ponta a ponta opcional conforme `docs/E2EE-DESIGN.md` e validá-la entre todos os clientes antes de anunciá-la;
+- validar a E2EE experimental em chamadas reais navegador ↔ Windows ↔ Android/iOS, incluindo chave incorreta, reconexão, segundo plano, compartilhamento, rotação de chave e medições de desempenho; somente depois promovê-la à versão pública estável;
 - validar o novo sistema visual em navegadores, Windows e aparelhos móveis reais, incluindo contraste, leitores de tela, movimento/transparência reduzidos e desempenho;
 - auditoria de segurança e privacidade antes de promover a branch para `main`.
 

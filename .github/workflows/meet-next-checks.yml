@@ -29,7 +29,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run check
-      - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs scripts/test-media-start.cjs scripts/test-security-regressions.cjs scripts/test-sounds.cjs
+      - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs scripts/test-e2ee.cjs scripts/test-media-start.cjs scripts/test-security-regressions.cjs scripts/test-sounds.cjs
       - name: Testar interface em navegador
         run: |
           node scripts/test-prejoin.cjs

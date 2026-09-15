@@ -1,8 +1,8 @@
 # Projeto de criptografia ponta a ponta opcional
 
-Status: **arquitetura aprovada para implementação; recurso ainda desativado e não anunciado como disponível**.
+Status: **implementação experimental concluída em `feat/meet-next`; verificações automatizadas aprovadas e validação cruzada em aparelhos reais ainda pendente**.
 
-Este documento define os limites de segurança e os testes mínimos antes de oferecer criptografia ponta a ponta (E2EE) no Kpnc Meet. A implementação deve usar os recursos E2EE dos SDKs LiveKit já fixados no projeto (`livekit-client` 2.22.1 e `@livekit/react-native` 2.12.0), sem criar uma criptografia própria.
+Este documento define os limites de segurança e os testes mínimos antes de promover a criptografia ponta a ponta (E2EE) do Kpnc Meet à versão pública estável. A implementação usa os recursos E2EE dos SDKs LiveKit fixados no projeto (`livekit-client` 2.22.1 e `@livekit/react-native` 2.12.0), sem criar uma criptografia própria.
 
 ## O que será protegido
 
@@ -35,11 +35,11 @@ Não serão aceitas senhas curtas escolhidas livremente como chave principal. Se
 - A chave e sua impressão nunca trafegam pelos endpoints de sala, espera, chat ou moderação.
 - Uma sala E2EE não aceita clientes sem suporte. Uma sala comum não muda para E2EE no meio de uma chamada.
 
-## Implementação prevista
+## Implementação atual
 
 ### Navegador e Windows
 
-- incluir na própria aplicação o worker E2EE correspondente exatamente à versão instalada de `livekit-client`;
+- obter o worker E2EE da versão exata `livekit-client` 2.22.1, conferir seu SHA-256 fixado antes de executá-lo e bloqueá-lo se conteúdo ou tamanho divergirem;
 - criar `ExternalE2EEKeyProvider` e inicializar a sala com o worker e o provedor de chave;
 - detectar suporte a Web Workers e Insertable Streams antes de permitir o modo;
 - manter a chave fora de `localStorage`, `sessionStorage`, URL e pontes IPC do Electron;
@@ -49,7 +49,21 @@ Não serão aceitas senhas curtas escolhidas livremente como chave principal. Se
 
 - integrar o gerenciador E2EE nativo e o provedor de chave do SDK React Native;
 - preservar a chave apenas no estado volátil da reunião, sem AsyncStorage, Expo Updates ou notificações;
-- validar câmera, microfone, compartilhamento, troca de dispositivo e serviço em primeiro plano com E2EE ativa.
+- inicializar o gerenciador E2EE nativo com chave compartilhada e tamanho de 128 bits;
+- manter qualquer erro de criptografia como bloqueante e encerrar a conexão, sem recuo para mídia comum;
+- validar em aparelhos reais câmera, microfone, compartilhamento, troca de dispositivo e serviço em primeiro plano com E2EE ativa.
+
+## Verificações automatizadas concluídas
+
+- geração criptograficamente segura de chaves aleatórias de 192 bits, representadas em 32 caracteres base64url;
+- impressão local curta por SHA-256 para conferência verbal;
+- integridade do worker web fixada e conferida antes da criação da sala;
+- negociação de `e2ee: true` ou `false` no Worker e rejeição de clientes em modo incompatível;
+- ausência da chave nos endpoints, parâmetros de URL, metadados e armazenamento persistente dos clientes;
+- compilação TypeScript do Worker e do cliente móvel;
+- tratamento bloqueante de chave ausente, formato inválido, cliente web sem suporte e erro de decifragem.
+
+Essas verificações não substituem as chamadas cruzadas e medições em dispositivos físicos listadas abaixo.
 
 ### Chat
 
@@ -77,4 +91,3 @@ O chat exigirá um projeto separado. Para ser E2EE, as mensagens deverão ser ci
 5. testes cruzados e de falha fechada;
 6. revisão de segurança;
 7. somente então, disponibilização do controle opcional e atualização da documentação pública.
-

@@ -47,6 +47,10 @@ test('immersive mobile viewer keeps fullscreen, zoom, landscape and chat modes t
  assert.match(source,/Math\.max\(1/);
  assert.match(source,/viewerMode==='chat'/);
  assert.match(source,/statusBarTranslucent/);
+ assert.match(source,/Escolher participante ou transmissão/);
+ assert.match(source,/selectViewerTile/);
+ assert.match(source,/tileSourceLabel/);
+ assert.match(source,/accessibilityState=\{\{selected\}\}/);
 });
 
 test('mobile chat provides bounded history, replies, safe links and categorized emojis',()=>{

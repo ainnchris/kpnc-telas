@@ -26,6 +26,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - chat com histórico limitado à duração da sala, respostas por referência, links seguros, avisos acessíveis e emojis categorizados também no aplicativo móvel.
 - serviço Android de chamada em primeiro plano, com áudio preservado ao apagar a tela e notificação permanente para silenciar o microfone, alternar a saída, voltar ao aplicativo ou encerrar a reunião.
 - confirmações e estados de andamento/resultado para as ações administrativas, estado de bloqueio sincronizado e histórico de moderação limitado, protegido e disponível para anfitrião e coanfitriões no navegador e no aplicativo.
+- alternância acessível entre câmeras, apresentações e participantes dentro do visualizador móvel imersivo, com recuperação automática quando a transmissão selecionada termina.
 
 ## Próximas etapas
 
@@ -39,7 +40,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 - validar cada resolução e FPS em máquinas e conexões diferentes, com adaptação quando o dispositivo não alcançar o valor escolhido;
 - validar os controles móveis de zoom e transmissão + chat em diferentes tamanhos de tela;
-- acrescentar a alternância de participantes ao visualizador imersivo;
+- validar a alternância de participantes do visualizador imersivo em diferentes tamanhos de tela;
 - testar tela cheia, paisagem e Picture-in-Picture em Android, iPhone e navegadores reais;
 - medir bitrate, perda de pacotes, uso de CPU/GPU e temperatura antes de definir padrões de qualidade.
 

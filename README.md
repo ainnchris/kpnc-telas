@@ -24,6 +24,7 @@ Plataforma de videoconferências com identidade própria, disponível no navegad
 - remoção, silenciamento, bloqueio de novas entradas e encerramento pelo anfitrião;
 - perfil local com nome, foto, GIF pequeno e avatares próprios;
 - quatro temas de interface;
+- sistema visual responsivo com superfícies espaciais, transparência progressiva e alternativas para movimento ou transparência reduzidos;
 - gravação local e legendas nos navegadores compatíveis;
 - atualizador do aplicativo Windows com verificação SHA-256;
 - atualização Android baixada e verificada dentro do aplicativo, com confirmação final do sistema.

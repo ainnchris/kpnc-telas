@@ -37,3 +37,4 @@ jobs:
           node scripts/test-meet-polish.cjs
           node scripts/test-meet-advanced.cjs
           node scripts/test-web-feedback.cjs
+          node scripts/test-visual-system.cjs

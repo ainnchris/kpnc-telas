@@ -29,6 +29,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - alternância acessível entre câmeras, apresentações e participantes dentro do visualizador móvel imersivo, com recuperação automática quando a transmissão selecionada termina.
 - atualizador do Windows com progresso por etapa, retomada segura de downloads interrompidos, reaproveitamento de instalador verificado e recuperação amigável de falhas; a assinatura definitiva continua pendente.
 - arquitetura e limites da criptografia ponta a ponta opcional definidos em `docs/E2EE-DESIGN.md`, incluindo ciclo de chaves, falha fechada, separação entre mídia e chat e critérios de testes cruzados; o recurso permanece desativado até a implementação e validação completas.
+- sistema visual unificado entre web, Windows e aplicativo móvel com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, incluindo fallbacks opacos, movimento reduzido, contraste e controles responsivos; especificação em `docs/VISUAL-SYSTEM.md`.
 
 ## Próximas etapas
 
@@ -57,7 +58,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 ### Segurança e interface
 
 - implementar a criptografia ponta a ponta opcional conforme `docs/E2EE-DESIGN.md` e validá-la entre todos os clientes antes de anunciá-la;
-- revisão visual conjunta com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, mantendo contraste, desempenho, movimento reduzido e acessibilidade;
+- validar o novo sistema visual em navegadores, Windows e aparelhos móveis reais, incluindo contraste, leitores de tela, movimento/transparência reduzidos e desempenho;
 - auditoria de segurança e privacidade antes de promover a branch para `main`.
 
 ## Critérios para publicação

@@ -27,6 +27,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - serviço Android de chamada em primeiro plano, com áudio preservado ao apagar a tela e notificação permanente para silenciar o microfone, alternar a saída, voltar ao aplicativo ou encerrar a reunião.
 - confirmações e estados de andamento/resultado para as ações administrativas, estado de bloqueio sincronizado e histórico de moderação limitado, protegido e disponível para anfitrião e coanfitriões no navegador e no aplicativo.
 - alternância acessível entre câmeras, apresentações e participantes dentro do visualizador móvel imersivo, com recuperação automática quando a transmissão selecionada termina.
+- atualizador do Windows com progresso por etapa, retomada segura de downloads interrompidos, reaproveitamento de instalador verificado e recuperação amigável de falhas; a assinatura definitiva continua pendente.
 
 ## Próximas etapas
 
@@ -49,7 +50,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - validar em aparelhos Android reais o áudio em segundo plano, tela apagada e os controles da notificação permanente;
 - ativar o projeto/canal EAS para atualizações rápidas da interface;
 - configurar e preservar uma chave Android definitiva. Ao trocar a assinatura experimental atual pela definitiva, poderá ser necessária uma última reinstalação; depois disso, as atualizações poderão substituir o mesmo aplicativo;
-- completar e validar o atualizador do Windows com instalador assinado, retomada, progresso e recuperação de falhas;
+- validar o atualizador do Windows em uma versão assinada com certificado definitivo;
 - testar câmera, microfone, Bluetooth, rotação, reconexão e atualização em aparelhos físicos.
 
 ### Segurança e interface

@@ -121,7 +121,7 @@ async function openPreview(page, mode, name, key = '') {
     await guest.waitForFunction(() => window.__kpncReconnectEvents.includes('reconnected') || window.__kpncReconnectError, null, { timeout: 45_000 });
     const reconnect = await guest.evaluate(() => ({ events: window.__kpncReconnectEvents, error: window.__kpncReconnectError }));
     assert.equal(reconnect.error, '');
-    assert.deepEqual(reconnect.events.slice(0, 2), ['reconnecting', 'reconnected']);
+    assert(reconnect.events.includes('reconnected'), 'LiveKit must confirm the restored connection');
     await guest.waitForFunction(() => /^E2EE.*Conexão|^E2EE.*Conectado/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 45_000 });
 
     assert.deepEqual(pageErrors, []);

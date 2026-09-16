@@ -8,6 +8,7 @@ Plataforma de videoconferências com identidade própria, disponível no navegad
 
 - Web: <https://kpnc-meet.pages.dev>
 - API: <https://kpnc-meet-api.erikchristian2.workers.dev>
+- Prévia da próxima versão: <https://feat-meet-next.kpnc-meet.pages.dev> com API e salas separadas da produção;
 - Windows e Android: os instaladores publicados aparecem no próprio site.
 - iPhone: ainda não há uma versão instalável em aparelho físico.
 
@@ -82,6 +83,8 @@ pnpm run worker:deploy
 ```
 
 O deploy usa `--keep-vars` para preservar a configuração existente. O frontend usa a API definida em `public/js/app.js`; uma implantação alternativa pode definir `window.KPNC_API_URL` antes desse arquivo ser carregado.
+
+A próxima versão usa `worker/wrangler.preview.jsonc`, o serviço `kpnc-meet-api-preview`, Durable Objects próprios e o prefixo `meet-next-preview-` nas salas LiveKit. A prévia web seleciona essa API somente no hostname exato da branch. Builds móveis da branch recebem `EXPO_PUBLIC_KPNC_WEBSITE` e `EXPO_PUBLIC_KPNC_API_URL`; o Windows abre o mesmo ambiente somente com `--meet-preview`. Os quatro segredos necessários pertencem ao ambiente protegido `preview` do GitHub e nunca são copiados para o código.
 
 ## Segurança e privacidade
 

@@ -6,8 +6,11 @@
   "license": "UNLICENSED",
   "scripts": {
     "check": "tsc --noEmit -p worker/tsconfig.json && wrangler deploy --dry-run --config worker/wrangler.jsonc",
+    "check:preview": "tsc --noEmit -p worker/tsconfig.json && wrangler deploy --dry-run --config worker/wrangler.preview.jsonc",
     "worker:dev": "wrangler dev --config worker/wrangler.jsonc",
+    "worker:dev:preview": "wrangler dev --config worker/wrangler.preview.jsonc",
     "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc --keep-vars",
+    "worker:deploy:preview": "wrangler deploy --config worker/wrangler.preview.jsonc --keep-vars",
     "worker:types": "wrangler types --config worker/wrangler.jsonc worker/worker-configuration.d.ts"
   },
   "devDependencies": {

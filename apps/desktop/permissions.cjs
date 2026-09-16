@@ -1,13 +1,13 @@
 'use strict';
-const {isMeetURL}=require('./policy.cjs');
+const {SITE,isMeetURL}=require('./policy.cjs');
 function checkPermission(permission,details,grants){
   if(['fullscreen','display-capture','speaker-selection'].includes(permission))return true;
   if(permission!=='media')return false;
   return details.mediaType==='unknown'?(grants.has('audio')&&grants.has('video')):grants.has(details.mediaType);
 }
-function setupPermissions({ses,getMain,BrowserWindow,ipcMain,path}){
+function setupPermissions({ses,getMain,BrowserWindow,ipcMain,path,site=SITE}){
   const grants=new Set();let active=null;
-  const trusted=(wc,url,details)=>!!getMain()&&!getMain().isDestroyed()&&wc===getMain().webContents&&isMeetURL(url)&&details.isMainFrame!==false;
+  const trusted=(wc,url,details)=>!!getMain()&&!getMain().isDestroyed()&&wc===getMain().webContents&&isMeetURL(url,site)&&details.isMainFrame!==false;
   function finish(allow=false){
     const current=active;if(!current)return;active=null;clearTimeout(current.timer);
     const permitted=allow&&!current.wc.isDestroyed()&&trusted(current.wc,current.wc.getURL(),current.details);

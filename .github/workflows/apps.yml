@@ -42,6 +42,8 @@ jobs:
     timeout-minutes: 45
     env:
       EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_KPNC_WEBSITE: ${{ github.ref == 'refs/heads/feat/meet-next' && 'https://feat-meet-next.kpnc-meet.pages.dev' || 'https://kpnc-meet.pages.dev' }}
+      EXPO_PUBLIC_KPNC_API_URL: ${{ github.ref == 'refs/heads/feat/meet-next' && 'https://kpnc-meet-api-preview.erikchristian2.workers.dev' || 'https://kpnc-meet-api.erikchristian2.workers.dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -108,6 +110,9 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_KPNC_WEBSITE: ${{ github.ref == 'refs/heads/feat/meet-next' && 'https://feat-meet-next.kpnc-meet.pages.dev' || 'https://kpnc-meet.pages.dev' }}
+      EXPO_PUBLIC_KPNC_API_URL: ${{ github.ref == 'refs/heads/feat/meet-next' && 'https://kpnc-meet-api-preview.erikchristian2.workers.dev' || 'https://kpnc-meet-api.erikchristian2.workers.dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

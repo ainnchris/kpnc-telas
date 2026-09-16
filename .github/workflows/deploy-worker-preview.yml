@@ -1,0 +1,96 @@
+name: Deploy Worker de prévia
+
+on:
+  push:
+    branches: [feat/meet-next]
+    paths:
+      - worker/**
+      - public/js/runtime-config.js
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/deploy-worker-preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kpnc-meet-worker-preview
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check:preview
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Conferir credenciais isoladas de prévia
+        id: credentials
+        shell: bash
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LK_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LK_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+        run: |
+          if [ -n "$CF_TOKEN" ] && [ -n "$CF_ACCOUNT" ] && [ -n "$LK_KEY" ] && [ -n "$LK_SECRET" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '### Worker de prévia não publicado' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Configure CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, LIVEKIT_API_KEY e LIVEKIT_API_SECRET no ambiente GitHub preview.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Publicar Worker isolado
+        if: steps.credentials.outputs.available == 'true'
+        run: pnpm run worker:deploy:preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Configurar segredos somente no Worker de prévia
+        if: steps.credentials.outputs.available == 'true'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+        run: |
+          printf '%s' "$LIVEKIT_API_KEY" | pnpm exec wrangler secret put LIVEKIT_API_KEY --config worker/wrangler.preview.jsonc
+          printf '%s' "$LIVEKIT_API_SECRET" | pnpm exec wrangler secret put LIVEKIT_API_SECRET --config worker/wrangler.preview.jsonc
+      - name: Validar saúde e CORS da prévia
+        if: steps.credentials.outputs.available == 'true'
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -H 'Origin: https://feat-meet-next.kpnc-meet.pages.dev' \
+            -D preview-headers.txt \
+            https://kpnc-meet-api-preview.erikchristian2.workers.dev/health \
+            -o preview-health.json
+          grep -Fqi 'access-control-allow-origin: https://feat-meet-next.kpnc-meet.pages.dev' preview-headers.txt
+          grep -Fq '"ok":true' preview-health.json

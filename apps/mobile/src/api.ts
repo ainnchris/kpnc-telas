@@ -1,5 +1,7 @@
-export const WEBSITE = 'https://kpnc-meet.pages.dev';
-const API = 'https://kpnc-meet-api.erikchristian2.workers.dev';
+const PRODUCTION_WEBSITE = 'https://kpnc-meet.pages.dev';
+const PRODUCTION_API = 'https://kpnc-meet-api.erikchristian2.workers.dev';
+export const WEBSITE = process.env.EXPO_PUBLIC_KPNC_WEBSITE?.trim() || PRODUCTION_WEBSITE;
+export const API = process.env.EXPO_PUBLIC_KPNC_API_URL?.trim() || PRODUCTION_API;
 export interface Profile {name:string; avatar:string}
 export interface Auth {token:string;url:string;room:string;host:boolean;e2ee:boolean;hostKey?:string;memberKey?:string}
 export interface JoinRequest {requestId:string;requestSecret:string;room:string}

@@ -6,6 +6,9 @@ test('invite bridge writes only room links; external links allow HTTP(S), not na
  assert.equal(externalURL('https://example.org/path'),'https://example.org/path');
  for(const value of ['file:///C:/test','javascript:alert(1)','ms-settings:','https://user:pass@example.org'])assert.equal(externalURL(value),null);
 });
+test('preview invitation requires an explicit preview site',()=>{
+ assert.equal(inviteURL('abc-def','https://feat-meet-next.kpnc-meet.pages.dev'),'https://feat-meet-next.kpnc-meet.pages.dev/?room=abc-def');
+});
 test('window and clipboard IPC reject other frames and origins',async()=>{
  const handlers={},wc={mainFrame:{},getURL:()=> 'https://kpnc-meet.pages.dev/'},win={webContents:wc,isDestroyed:()=>false,isMaximized:()=>false,isFullScreen:()=>false,minimize:()=>{win.minimized=true}};let copied;
  setupWindowControls({ipcMain:{handle:(name,fn)=>handlers[name]=fn},getMain:()=>win,clipboard:{writeText:value=>copied=value}});

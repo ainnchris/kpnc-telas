@@ -17,7 +17,7 @@ import * as SystemUI from 'expo-system-ui';
 import * as Updates from 'expo-updates';
 import {AudioSession, LiveKitRoom, VideoTrack, isTrackReference, useRNE2EEManager, useRoomContext, useTracks} from '@livekit/react-native';
 import {createLocalAudioTrack, createLocalVideoTrack, LocalVideoTrack, Participant, RoomEvent, Track} from 'livekit-client';
-import {api, ApiError, Auth, JoinRequest, Pending, post, Profile, roomCode, WEBSITE} from './api';
+import {api, API, ApiError, Auth, JoinRequest, Pending, post, Profile, roomCode, WEBSITE} from './api';
 
 const APP_VERSION='0.4.0';
 type Glyph = React.ComponentProps<typeof Ionicons>['name'];
@@ -173,7 +173,7 @@ function App() {
   useEffect(()=>{
     if(screen!=='preview')return;
     let active=true;const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000),started=Date.now();setChecks(value=>({...value,network:'checking'}));setNetworkDetail('Medindo resposta…');
-    void fetch(WEBSITE.replace('kpnc-meet.pages.dev','kpnc-meet-api.erikchristian2.workers.dev')+'/health',{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('health');const latency=Date.now()-started;if(active){setChecks(value=>({...value,network:latency<700?'good':'bad'}));setNetworkDetail(latency<250?`Boa resposta (${latency} ms)`:latency<700?`Resposta moderada (${latency} ms)`:`Resposta lenta (${latency} ms)`)}}).catch(()=>{if(active){setChecks(value=>({...value,network:'bad'}));setNetworkDetail('Não foi possível alcançar o serviço')}}).finally(()=>clearTimeout(timer));
+    void fetch(API+'/health',{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('health');const latency=Date.now()-started;if(active){setChecks(value=>({...value,network:latency<700?'good':'bad'}));setNetworkDetail(latency<250?`Boa resposta (${latency} ms)`:latency<700?`Resposta moderada (${latency} ms)`:`Resposta lenta (${latency} ms)`)}}).catch(()=>{if(active){setChecks(value=>({...value,network:'bad'}));setNetworkDetail('Não foi possível alcançar o serviço')}}).finally(()=>clearTimeout(timer));
     return()=>{active=false;clearTimeout(timer);controller.abort()};
   },[screen,previewRevision]);
   useEffect(()=>{let active=true;AsyncStorage.multiGet(['kpnc-profile','kpnc-theme']).then(values=>{

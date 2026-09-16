@@ -62,6 +62,8 @@ O instalador vai para `apps/desktop/dist`. Sem certificado de assinatura, o Wind
 
 O aplicativo mantém `nodeIntegration:false`, `contextIsolation:true`, sandbox e validação TLS. Só a origem exata do site tem acesso ao fluxo de permissão de dispositivos. Compartilhar tela abre um seletor local; áudio do computador é opcional e começa desmarcado. Cancelar nunca escolhe uma tela automaticamente.
 
+Para validações da `feat/meet-next`, iniciar o executável com `--meet-preview`. Esse modo aceita somente `https://feat-meet-next.kpnc-meet.pages.dev`, usa um perfil Electron separado e gera convites para a prévia. Sem a opção, o aplicativo continua aceitando somente o site público estável.
+
 Atalhos na janela: Ctrl+Shift+M (microfone), Ctrl+Shift+V (câmera), Ctrl+Shift+C (chat). Não são atalhos globais. O protocolo `kpncmeet://join/codigo-da-sala` é registrado pelo instalador; ao abrir outro convite durante uma sessão, pede confirmação.
 
 Teste de carregamento oculto, sem acessar dispositivos:
@@ -82,6 +84,8 @@ pnpm --filter kpnc-meet-mobile android
 ```
 
 O workflow `Aplicativos de teste` também gera um APK experimental usando `assembleRelease` no projeto gerado. O template Expo usa assinatura de desenvolvimento: ela **não é a identidade de assinatura para uma publicação definitiva**. Para loja, configurar chave de upload/Play App Signing e produzir AAB; preservar a chave em armazenamento seguro, nunca no GitHub.
+
+Na `feat/meet-next`, os artefatos Android e iOS recebem por variável de compilação as URLs da prévia. Builds de produção mantêm os endereços públicos como padrão; nenhum segredo LiveKit entra no aplicativo.
 
 Como alternativa com conta Expo, usar EAS: `eas build --platform android --profile preview` dentro de `apps/mobile`. Isso requer vincular o projeto à conta; nenhum projeto remoto ou conta foi criado automaticamente. Custos/filas dependem do plano escolhido.
 

@@ -62,6 +62,7 @@ Não serão aceitas senhas curtas escolhidas livremente como chave principal. Se
 - ausência da chave nos endpoints, parâmetros de URL, metadados e armazenamento persistente dos clientes;
 - compilação TypeScript do Worker e do cliente móvel;
 - tratamento bloqueante de chave ausente, formato inválido, cliente web sem suporte e erro de decifragem.
+- separação explícita entre produção e prévia: serviço Worker, Durable Objects, nomes de salas LiveKit, origem web, perfil Windows e configuração móvel independentes.
 
 Essas verificações não substituem as chamadas cruzadas e medições em dispositivos físicos listadas abaixo.
 
@@ -88,6 +89,6 @@ O chat exigirá um projeto separado. Para ser E2EE, as mensagens deverão ser ci
 2. implementação web com worker versionado localmente;
 3. integração do aplicativo Windows sem enviar chaves por IPC;
 4. integração Android e iOS;
-5. testes cruzados e de falha fechada;
+5. ambiente de prévia isolado e testes cruzados de falha fechada;
 6. revisão de segurança;
 7. somente então, disponibilização do controle opcional e atualização da documentação pública.

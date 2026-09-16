@@ -187,6 +187,10 @@ function roomCode(): string {
   const part = (start: number) => Array.from(bytes.slice(start, start + 4), (byte) => alphabet[byte % alphabet.length]).join('');
   return `${part(0)}-${part(4)}-${part(8)}`;
 }
+function livekitRoom(env: Env, room: string): string {
+  const prefix = (env.ROOM_PREFIX || '').trim().replace(/[^a-z0-9_-]/gi, '').slice(0, 32);
+  return `${prefix}${room}`;
+}
 async function readBody(request: Request): Promise<Record<string, unknown>> {
   const length = Number(request.headers.get('Content-Length') || 0); if (length > MAX_BODY_BYTES) throw new Error('BODY_TOO_LARGE');
   const body = await request.text(); if (encoder.encode(body).byteLength > MAX_BODY_BYTES) throw new Error('BODY_TOO_LARGE');
@@ -201,12 +205,13 @@ async function signedToken(env: Env, payload: Record<string, unknown>): Promise<
 }
 async function issueToken(env: Env, room: string, name: string, host: boolean, avatar = '', assignedIdentity = ''): Promise<string> {
   const now = Math.floor(Date.now() / 1000); const identity = assignedIdentity || `${host ? 'host' : 'guest'}-${crypto.randomUUID()}`;
-  return signedToken(env, { exp: now + 6 * 60 * 60, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name, metadata: JSON.stringify({ host, avatar }), video: { roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } });
+  return signedToken(env, { exp: now + 6 * 60 * 60, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: identity, name, metadata: JSON.stringify({ host, avatar }), video: { roomJoin: true, room: livekitRoom(env, room), canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true } });
 }
 async function roomService(env: Env, room: string, method: 'RemoveParticipant' | 'MutePublishedTrack' | 'UpdateParticipant' | 'DeleteRoom', body: Record<string, unknown>): Promise<void> {
-  const now = Math.floor(Date.now() / 1000); const token = await signedToken(env, { exp: now + 300, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: `kpnc-admin-${crypto.randomUUID()}`, video: { roomAdmin: true, room } });
+  const serviceRoom = livekitRoom(env, room);
+  const now = Math.floor(Date.now() / 1000); const token = await signedToken(env, { exp: now + 300, iss: env.LIVEKIT_API_KEY, nbf: now - 5, sub: `kpnc-admin-${crypto.randomUUID()}`, video: { roomAdmin: true, room: serviceRoom } });
   const base = env.LIVEKIT_URL.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:').replace(/\/$/, '');
-  const response = await fetch(`${base}/twirp/livekit.RoomService/${method}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const response = await fetch(`${base}/twirp/livekit.RoomService/${method}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, room: serviceRoom }) });
   if (!response.ok) throw new Error('LIVEKIT_ADMIN_FAILED');
 }
 function coordinator(env: Env, room: string): DurableObjectStub<RoomCoordinator> { return env.ROOMS.getByName(room) as DurableObjectStub<RoomCoordinator>; }

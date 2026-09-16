@@ -1,14 +1,14 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
-  "name": "kpnc-meet-api",
+  "name": "kpnc-meet-api-preview",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-27",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
   "vars": {
     "LIVEKIT_URL": "wss://kpnc-projects-01lpu7f8.livekit.cloud",
-    "ALLOWED_ORIGINS": "https://kpnc-meet.pages.dev,http://localhost:3000,http://localhost:8788",
-    "ROOM_PREFIX": ""
+    "ALLOWED_ORIGINS": "https://feat-meet-next.kpnc-meet.pages.dev,http://localhost:3000,http://localhost:8788",
+    "ROOM_PREFIX": "meet-next-preview-"
   },
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "RoomCoordinator" }]
@@ -17,4 +17,3 @@
   "secrets": { "required": ["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }
-

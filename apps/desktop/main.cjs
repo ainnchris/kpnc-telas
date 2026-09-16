@@ -1,7 +1,7 @@
 'use strict';
 const {app, BrowserWindow, Menu, session, dialog, desktopCapturer, ipcMain, shell, clipboard} = require('electron');
 const path = require('node:path');
-const {SITE, isMeetURL, meetingLink} = require('./policy.cjs');
+const {SITE, PREVIEW_SITE, isMeetURL, meetingLink} = require('./policy.cjs');
 const hardware=require('./hardware-acceleration.cjs');
 if (!app.isPackaged && (process.argv.includes('--smoke-test') || process.argv.includes('--media-smoke'))) {
   const profile = path.join(__dirname,'dist','smoke-profile');
@@ -10,10 +10,11 @@ if (!app.isPackaged && (process.argv.includes('--smoke-test') || process.argv.in
 }
 let main, picker, pendingCapture;
 let permissions;
+const activeSite=process.argv.includes('--meet-preview')?PREVIEW_SITE:SITE;
 const hardwareEnabledAtStartup=hardware.applyHardwareAcceleration(app);
-const startupLink = process.argv.map(meetingLink).find(Boolean) || SITE;
+const startupLink = process.argv.map(value=>meetingLink(value,activeSite)).find(Boolean) || activeSite;
 function trusted(contents, url) {
-  return !!main && !main.isDestroyed() && contents === main.webContents && isMeetURL(url);
+  return !!main && !main.isDestroyed() && contents === main.webContents && isMeetURL(url,activeSite);
 }
 function finishCapture(result = {}) {
   const pending = pendingCapture;
@@ -28,9 +29,9 @@ function finishCapture(result = {}) {
 }
 async function chooseScreen(request, callback) {
   const validFrame=!!main&&request.frame===main.webContents.mainFrame;
-  console.info('MEET_CAPTURE_REQUEST',JSON.stringify({validFrame,trustedOrigin:isMeetURL(request.securityOrigin),userGesture:request.userGesture,busy:!!pendingCapture}));
+  console.info('MEET_CAPTURE_REQUEST',JSON.stringify({validFrame,trustedOrigin:isMeetURL(request.securityOrigin,activeSite),userGesture:request.userGesture,busy:!!pendingCapture}));
   // The explicit local picker is the consent boundary, even after async SDK work.
-  if (!validFrame || !isMeetURL(request.securityOrigin) || pendingCapture) return callback({});
+  if (!validFrame || !isMeetURL(request.securityOrigin,activeSite) || pendingCapture) return callback({});
   const pending = {callback, sources:[], timer:setTimeout(() => finishCapture(), 60000), audio:request.audioRequested};
   pendingCapture = pending;
   try {
@@ -55,20 +56,20 @@ ipcMain.on('capture:select', (event, selection) => {
   if (!source) return finishCapture();
   finishCapture({video:source,...(selection.audio === true && pendingCapture.audio && process.platform === 'win32' ? {audio:'loopback'} : {})});
 });
-function sendAction(id) { if (main && !main.isDestroyed() && isMeetURL(main.webContents.getURL())) main.webContents.send('meet:action',id); }
+function sendAction(id) { if (main && !main.isDestroyed() && isMeetURL(main.webContents.getURL(),activeSite)) main.webContents.send('meet:action',id); }
 async function createWindow() {
   const smokeTest = !app.isPackaged && process.argv.includes('--smoke-test');
   main = new BrowserWindow({show:!smokeTest,frame:false,width:1280,height:820,minWidth:420,minHeight:580,title:'Kpnc Meet',backgroundColor:'#080c12',icon:path.join(__dirname,'assets/icon.ico'),
-    webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:'persist:kpnc-meet'}});
+    webPreferences:{preload:path.join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,partition:activeSite===PREVIEW_SITE?'persist:kpnc-meet-preview':'persist:kpnc-meet'}});
   require('./updater.cjs').setupUpdater({app,ipcMain,getMain:()=>main,shell});
-  require('./window-controls.cjs').setupWindowControls({ipcMain,getMain:()=>main,clipboard});
+  require('./window-controls.cjs').setupWindowControls({ipcMain,getMain:()=>main,clipboard,site:activeSite});
   hardware.setupHardwareAcceleration({app,ipcMain,getMain:()=>main,enabledAtStartup:hardwareEnabledAtStartup});
   for(const event of ['maximize','unmaximize','enter-full-screen','leave-full-screen'])main.on(event,()=>main.webContents.send('meet:window-state',{maximized:main.isMaximized(),fullscreen:main.isFullScreen()}));
-  const ses = session.fromPartition('persist:kpnc-meet');
-  permissions=require('./permissions.cjs').setupPermissions({ses,getMain:()=>main,BrowserWindow,ipcMain,path});
+  const ses = session.fromPartition(activeSite===PREVIEW_SITE?'persist:kpnc-meet-preview':'persist:kpnc-meet');
+  permissions=require('./permissions.cjs').setupPermissions({ses,getMain:()=>main,BrowserWindow,ipcMain,path,site:activeSite});
   ses.setDisplayMediaRequestHandler(chooseScreen);
-  main.webContents.on('will-navigate',(event,url) => {if (!isMeetURL(url)) event.preventDefault(); permissions?.cancel(); finishCapture();});
-  main.webContents.on('will-redirect',(event,url) => {if (!isMeetURL(url)) event.preventDefault();});
+  main.webContents.on('will-navigate',(event,url) => {if (!isMeetURL(url,activeSite)) event.preventDefault(); permissions?.cancel(); finishCapture();});
+  main.webContents.on('will-redirect',(event,url) => {if (!isMeetURL(url,activeSite)) event.preventDefault();});
   main.webContents.on('will-attach-webview',event => event.preventDefault());
   main.webContents.setWindowOpenHandler(({url}) => {
     const target=require('./window-controls.cjs').externalURL(url);
@@ -79,7 +80,7 @@ async function createWindow() {
     if (!isMainFrame || code === -3 || main.isDestroyed()) return;
     if (smokeTest) {console.error('SMOKE_LOAD_FAILED',code);app.exit(1);return;}
     const choice = await dialog.showMessageBox(main,{type:'warning',message:'Não foi possível abrir o Kpnc Meet.',detail:'Confira a internet e tente novamente.',buttons:['Tentar novamente','Fechar'],defaultId:0});
-    if (choice.response === 0) void main.loadURL(SITE).catch(()=>{}); else main.close();
+    if (choice.response === 0) void main.loadURL(activeSite).catch(()=>{}); else main.close();
   });
   main.on('closed',()=>{permissions?.cancel();finishCapture();main=null;});
   Menu.setApplicationMenu(null);
@@ -106,7 +107,7 @@ else {
   app.on('second-instance',async (_event,args) => {
     if (!main) return;
     if (main.isMinimized()) main.restore(); main.focus();
-    const target = args.map(meetingLink).find(Boolean);
+    const target = args.map(value=>meetingLink(value,activeSite)).find(Boolean);
     if (target) {
       const result = await dialog.showMessageBox(main,{type:'question',message:'Abrir outra reunião?',detail:'Isso sai da reunião atual, se houver.',buttons:['Cancelar','Abrir'],defaultId:0,cancelId:0});
       if (result.response === 1) void main.loadURL(target).catch(()=>{});

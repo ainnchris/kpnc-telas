@@ -30,7 +30,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - atualizador do Windows com progresso por etapa, retomada segura de downloads interrompidos, reaproveitamento de instalador verificado e recuperação amigável de falhas; a assinatura definitiva continua pendente.
 - E2EE opcional de mídia implementada de forma experimental no navegador, Windows, Android e iOS: chave aleatória somente em memória, impressão local, negociação de modo no Worker, worker web com SHA-256 fixado, provedor nativo e falha fechada; chat, admissão e moderação continuam explicitamente fora da E2EE.
 - sistema visual unificado entre web, Windows e aplicativo móvel com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, incluindo fallbacks opacos, movimento reduzido, contraste e controles responsivos; especificação em `docs/VISUAL-SYSTEM.md`.
-- ambiente de validação separado da produção, com Worker, Durable Objects e nomes de sala LiveKit próprios; seleção automática na prévia web, configuração de build móvel e modo explícito `--meet-preview` no Windows.
+- ambiente de validação separado da produção, com Worker, Durable Objects e nomes de sala LiveKit próprios; seleção automática na prévia web, configuração de build móvel e modo explícito `--meet-preview` no Windows; segredos protegidos publicados e saúde/CORS do Worker isolado confirmados pelo workflow.
 
 ## Próximas etapas
 
@@ -58,7 +58,6 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 ### Segurança e interface
 
-- publicar os segredos no ambiente GitHub protegido `preview` e confirmar saúde/CORS do Worker isolado;
 - validar a E2EE experimental no ambiente isolado em chamadas reais navegador ↔ Windows ↔ Android/iOS, incluindo chave incorreta, reconexão, segundo plano, compartilhamento, rotação de chave e medições de desempenho; somente depois promovê-la à versão pública estável;
 - validar o novo sistema visual em navegadores, Windows e aparelhos móveis reais, incluindo contraste, leitores de tela, movimento/transparência reduzidos e desempenho;
 - auditoria de segurança e privacidade antes de promover a branch para `main`.

@@ -110,9 +110,18 @@ async function openPreview(page, mode, name, key = '') {
     assert.match(await guest.locator('#connection').innerText(), /^E2EE/);
 
     await guest.evaluate(() => {
-      window.__kpncReconnect = window.__kpncLiveRoom.simulateScenario('signal-reconnect');
+      window.__kpncReconnectEvents = [];
+      window.__kpncReconnectError = '';
+      window.__kpncLiveRoom.on(window.LivekitClient.RoomEvent.Reconnecting, () => window.__kpncReconnectEvents.push('reconnecting'));
+      window.__kpncLiveRoom.on(window.LivekitClient.RoomEvent.Reconnected, () => window.__kpncReconnectEvents.push('reconnected'));
+      window.__kpncReconnect = window.__kpncLiveRoom.simulateScenario('signal-reconnect').catch(error => {
+        window.__kpncReconnectError = error.message;
+      });
     });
-    await guest.waitForFunction(() => /Reconectando|perdida/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 30_000 });
+    await guest.waitForFunction(() => window.__kpncReconnectEvents.includes('reconnected') || window.__kpncReconnectError, null, { timeout: 45_000 });
+    const reconnect = await guest.evaluate(() => ({ events: window.__kpncReconnectEvents, error: window.__kpncReconnectError }));
+    assert.equal(reconnect.error, '');
+    assert.deepEqual(reconnect.events.slice(0, 2), ['reconnecting', 'reconnected']);
     await guest.waitForFunction(() => /^E2EE.*Conexão|^E2EE.*Conectado/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 45_000 });
 
     assert.deepEqual(pageErrors, []);

@@ -14,6 +14,7 @@ const e2eeDesign=fs.readFileSync(path.join(root,'docs/E2EE-DESIGN.md'),'utf8');
 assert(worker.includes('clean(bearer(request), 128)'),'admission secret must prefer the Authorization header');
 assert(!web.includes('&secret='),'web client must not put admission secrets in URLs');
 assert(web.includes('function inviteURL(code)')&&web.includes('location.origin')&&!web.includes('https://kpnc-meet.pages.dev/?room='),'browser invitations must remain in the active production or preview environment');
+assert(!web.includes("admission.style.display='none'"),'the quick admission card must become visible when a guest is waiting');
 assert(!mobile.includes('&secret='),'mobile client must not put admission secrets in URLs');
 assert(worker.includes('MAX_REQUESTS_PER_ROOM'),'waiting room must have an abuse limit');
 assert(worker.includes("result === 'locked'")&&worker.includes('setLocked'),'locked rooms must reject new join requests at the coordinator');

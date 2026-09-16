@@ -37,7 +37,7 @@ jobs:
             echo 'mobile=false' >> "$GITHUB_OUTPUT"
           fi
   ios-simulator:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/feat/meet-next' && contains(github.event.head_commit.message, '[ios-preview]'))
     runs-on: macos-latest
     timeout-minutes: 45
     env:

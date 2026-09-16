@@ -31,7 +31,7 @@ jobs:
             echo 'mobile=true' >> "$GITHUB_OUTPUT"
           elif [[ "$BEFORE" =~ ^0+$ ]]; then
             echo 'mobile=true' >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BEFORE" HEAD | grep -Eq '^(apps/mobile/|pnpm-lock.yaml|pnpm-workspace.yaml)'; then
+          elif git diff --name-only "$BEFORE" HEAD | grep -Eq '^(apps/mobile/|pnpm-lock.yaml|pnpm-workspace.yaml|\.github/workflows/apps\.yml)'; then
             echo 'mobile=true' >> "$GITHUB_OUTPUT"
           else
             echo 'mobile=false' >> "$GITHUB_OUTPUT"

@@ -109,7 +109,9 @@ async function openPreview(page, mode, name, key = '') {
     await guest.waitForFunction(() => document.querySelectorAll('#grid video').length >= 2, null, { timeout: 30_000 });
     assert.match(await guest.locator('#connection').innerText(), /^E2EE/);
 
-    await guest.evaluate(() => window.__kpncLiveRoom.simulateScenario('signal-reconnect'));
+    await guest.evaluate(() => {
+      window.__kpncReconnect = window.__kpncLiveRoom.simulateScenario('signal-reconnect');
+    });
     await guest.waitForFunction(() => /Reconectando|perdida/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 30_000 });
     await guest.waitForFunction(() => /^E2EE.*Conexão|^E2EE.*Conectado/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 45_000 });
 

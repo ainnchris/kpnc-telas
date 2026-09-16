@@ -31,6 +31,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 - E2EE opcional de mídia implementada de forma experimental no navegador, Windows, Android e iOS: chave aleatória somente em memória, impressão local, negociação de modo no Worker, worker web com SHA-256 fixado, provedor nativo e falha fechada; chat, admissão e moderação continuam explicitamente fora da E2EE.
 - sistema visual unificado entre web, Windows e aplicativo móvel com Minimalism, Liquid Glass, Spatial UI e Immersive Visuals, incluindo fallbacks opacos, movimento reduzido, contraste e controles responsivos; especificação em `docs/VISUAL-SYSTEM.md`.
 - ambiente de validação separado da produção, com Worker, Durable Objects e nomes de sala LiveKit próprios; seleção automática na prévia web, configuração de build móvel e modo explícito `--meet-preview` no Windows; segredos protegidos publicados e saúde/CORS do Worker isolado confirmados pelo workflow.
+- chamada E2EE navegador ↔ navegador validada automaticamente no ambiente isolado, cobrindo convite restrito à prévia, sala de espera, admissão, dois participantes, áudio/vídeo e recuperação do sinal; o cartão rápido de admissão também foi corrigido para não ficar oculto ou coberto pelo painel lateral.
 
 ## Próximas etapas
 
@@ -58,7 +59,7 @@ Legenda: **implementado** significa que o código e as verificações automátic
 
 ### Segurança e interface
 
-- validar a E2EE experimental no ambiente isolado em chamadas reais navegador ↔ Windows ↔ Android/iOS, incluindo chave incorreta, reconexão, segundo plano, compartilhamento, rotação de chave e medições de desempenho; somente depois promovê-la à versão pública estável;
+- ampliar a validação E2EE do navegador já automatizada para chamadas reais navegador ↔ Windows ↔ Android/iOS, incluindo chave incorreta, troca de rede, segundo plano, compartilhamento, rotação de chave e medições de desempenho; somente depois promovê-la à versão pública estável;
 - validar o novo sistema visual em navegadores, Windows e aparelhos móveis reais, incluindo contraste, leitores de tela, movimento/transparência reduzidos e desempenho;
 - auditoria de segurança e privacidade antes de promover a branch para `main`.
 

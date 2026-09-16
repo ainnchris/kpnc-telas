@@ -30,6 +30,18 @@ async function context(browser) {
   });
 }
 
+async function captureRoom(page) {
+  await page.evaluate(() => {
+    const LiveKitRoom = window.LivekitClient.Room;
+    window.LivekitClient.Room = class TestableRoom extends LiveKitRoom {
+      constructor(...args) {
+        super(...args);
+        window.__kpncLiveRoom = this;
+      }
+    };
+  });
+}
+
 async function openPreview(page, mode, name, key = '') {
   await page.locator(mode === 'create' ? '#new-meeting' : '#join-meeting').click();
   await page.locator('#preview').waitFor({ state: 'visible' });
@@ -64,6 +76,7 @@ async function openPreview(page, mode, name, key = '') {
     }
 
     await host.goto(site, { waitUntil: 'domcontentloaded' });
+    await captureRoom(host);
     await openPreview(host, 'create', 'Anfitrião automático');
     const key = await host.locator('#e2ee-key').inputValue();
     assert.match(key, /^[A-Za-z0-9_-]{32}$/);
@@ -79,6 +92,7 @@ async function openPreview(page, mode, name, key = '') {
     assert.equal(invite, `${site}/?room=${encodeURIComponent(room)}`);
 
     await guest.goto(invite, { waitUntil: 'domcontentloaded' });
+    await captureRoom(guest);
     assert.equal(await guest.locator('#room-code').inputValue(), room);
     await openPreview(guest, 'join', 'Convidado automático', key);
     await guest.locator('#enter-room').click();
@@ -95,9 +109,8 @@ async function openPreview(page, mode, name, key = '') {
     await guest.waitForFunction(() => document.querySelectorAll('#grid video').length >= 2, null, { timeout: 30_000 });
     assert.match(await guest.locator('#connection').innerText(), /^E2EE/);
 
-    await guestContext.setOffline(true);
+    await guest.evaluate(() => window.__kpncLiveRoom.simulateScenario('signal-reconnect'));
     await guest.waitForFunction(() => /Reconectando|perdida/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 30_000 });
-    await guestContext.setOffline(false);
     await guest.waitForFunction(() => /^E2EE.*Conexão|^E2EE.*Conectado/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 45_000 });
 
     assert.deepEqual(pageErrors, []);

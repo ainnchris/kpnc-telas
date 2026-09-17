@@ -8,6 +8,7 @@ Plataforma de videoconferências com identidade própria, disponível no navegad
 
 - Web: <https://kpnc-meet.pages.dev>
 - API: <https://kpnc-meet-api.erikchristian2.workers.dev>
+- Prévia da próxima versão: <https://feat-meet-next.kpnc-meet.pages.dev> com API e salas separadas da produção;
 - Windows e Android: os instaladores publicados aparecem no próprio site.
 - iPhone: ainda não há uma versão instalável em aparelho físico.
 
@@ -16,14 +17,18 @@ Plataforma de videoconferências com identidade própria, disponível no navegad
 - criação de reunião e entrada por código ou link;
 - sala de espera com aprovação ou recusa pelo anfitrião;
 - câmera, microfone e seleção de dispositivos;
+- teste de câmera, microfone e resposta da internet antes da entrada;
 - compartilhamento de tela e áudio quando a plataforma oferece suporte;
-- grade responsiva, destaque de quem está falando e ampliação de apresentações;
-- lista de participantes, chat, emojis e mão levantada;
-- remoção, silenciamento e encerramento pelo anfitrião;
+- escolha de resolução e FPS da apresentação no navegador/aplicativo Windows;
+- grade responsiva, destaque de quem está falando, tela cheia móvel e janela flutuante;
+- lista de participantes, chat com emojis por categoria e mão levantada;
+- remoção, silenciamento, bloqueio de novas entradas e encerramento pelo anfitrião;
 - perfil local com nome, foto, GIF pequeno e avatares próprios;
 - quatro temas de interface;
+- sistema visual responsivo com superfícies espaciais, transparência progressiva e alternativas para movimento ou transparência reduzidos;
 - gravação local e legendas nos navegadores compatíveis;
-- atualizador do aplicativo Windows com verificação SHA-256.
+- atualizador do aplicativo Windows com verificação SHA-256;
+- atualização Android baixada e verificada dentro do aplicativo, com confirmação final do sistema.
 
 ## Arquitetura
 
@@ -40,10 +45,11 @@ Os segredos `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` pertencem somente ao Worker
 ## Branches
 
 - `main`: site e API publicados;
-- `feat/meet-multiplataforma`: desenvolvimento dos clientes Windows e Android/iOS;
+- `feat/meet-next`: desenvolvimento da próxima grande atualização do Meet;
+- `feat/meet-multiplataforma`: histórico da primeira etapa dos clientes Windows e Android/iOS;
 - `backup-estavel-2026-08-20` e `backup-meet-2026-09-09`: cópias de segurança que não devem ser modificadas.
 
-O desenvolvimento multiplataforma continua separado da `main` até a conclusão dos testes reais. Consulte [`docs/APLICATIVOS.md`](https://github.com/ainnchris/kpnc-telas/blob/feat/meet-multiplataforma/docs/APLICATIVOS.md) e os registros em `docs/VERSAO-*.md` nessa branch.
+O desenvolvimento da próxima versão continua separado da `main` até a conclusão dos testes reais. Consulte [`docs/ROADMAP-MEET-NEXT.md`](docs/ROADMAP-MEET-NEXT.md), [`docs/APLICATIVOS.md`](docs/APLICATIVOS.md) e os registros em `docs/VERSAO-*.md`.
 
 ## Desenvolvimento local
 
@@ -78,6 +84,8 @@ pnpm run worker:deploy
 
 O deploy usa `--keep-vars` para preservar a configuração existente. O frontend usa a API definida em `public/js/app.js`; uma implantação alternativa pode definir `window.KPNC_API_URL` antes desse arquivo ser carregado.
 
+A próxima versão usa `worker/wrangler.preview.jsonc`, o serviço `kpnc-meet-api-preview`, Durable Objects próprios e o prefixo `meet-next-preview-` nas salas LiveKit. A prévia web seleciona essa API somente no hostname exato da branch. Builds móveis da branch recebem `EXPO_PUBLIC_KPNC_WEBSITE` e `EXPO_PUBLIC_KPNC_API_URL`; o Windows abre o mesmo ambiente somente com `--meet-preview`. Os quatro segredos necessários pertencem ao ambiente protegido `preview` do GitHub e nunca são copiados para o código.
+
 ## Segurança e privacidade
 
 - tokens LiveKit são assinados somente no backend e limitados à sala correspondente;
@@ -88,17 +96,18 @@ O deploy usa `--keep-vars` para preservar a configuração existente. O frontend
 - downloads do atualizador Windows exigem origem conhecida e SHA-256 correspondente;
 - o site define Content Security Policy, bloqueio de frames e políticas restritivas de navegador;
 - mensagens, links e nomes são renderizados sem interpretar HTML fornecido por participantes;
-- chat e gravações não são persistidos pela aplicação; gravações são geradas no dispositivo do usuário;
+- o histórico do chat é limitado à duração da sala e gravações são geradas somente no dispositivo do usuário;
 - perfil e preferências ficam no armazenamento local do navegador ou aplicativo;
 - salas expiram automaticamente após 12 horas e solicitações de entrada após 15 minutos.
 
-O Kpnc Meet protege o tráfego em trânsito, mas não anuncia criptografia de ponta a ponta verificável. O LiveKit Cloud e os serviços de infraestrutura continuam fazendo parte do caminho de comunicação.
+O Kpnc Meet público estável protege o tráfego em trânsito, mas não anuncia criptografia de ponta a ponta verificável. Na branch `feat/meet-next`, existe um modo experimental de E2EE para áudio, câmera e compartilhamento de tela; a chave fica somente na memória dos clientes e nunca segue para a API. O chat, a admissão e a moderação continuam protegidos em trânsito, mas não são E2EE. A implementação, seus limites e os testes reais ainda obrigatórios estão em [`docs/E2EE-DESIGN.md`](docs/E2EE-DESIGN.md).
 
 Para operação pública, recomenda-se configurar limitação de tráfego no Cloudflare, monitorar erros e custos, assinar comercialmente os instaladores e manter os segredos fora de logs e mensagens.
 
 ## Limitações conhecidas
 
 - Android ainda precisa de validação de câmera, microfone, teclado, reconexão e segundo plano em aparelho físico;
+- o canal rápido de atualização Android ainda precisa ser vinculado a um projeto EAS e o APK definitivo precisa de uma chave de assinatura estável;
 - iOS foi compilado apenas para simulador e ainda depende de assinatura, CallKit e teste em iPhone;
 - GIFs grandes dependem de armazenamento externo e continuam adiados;
 - a transcrição local não está disponível no aplicativo Windows;

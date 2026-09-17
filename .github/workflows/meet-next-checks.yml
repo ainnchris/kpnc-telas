@@ -1,0 +1,40 @@
+name: Verificações do Meet Next
+
+on:
+  push:
+    branches: [feat/meet-next]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meet-next-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run check
+      - run: node --test apps/desktop/test/*.test.cjs apps/mobile/test/*.test.mjs scripts/test-e2ee.cjs scripts/test-media-start.cjs scripts/test-preview-environment.cjs scripts/test-security-regressions.cjs scripts/test-sounds.cjs
+      - name: Testar interface em navegador
+        run: |
+          node scripts/test-prejoin.cjs
+          node scripts/test-responsive.cjs
+          node scripts/test-meet-polish.cjs
+          node scripts/test-meet-advanced.cjs
+          node scripts/test-web-feedback.cjs
+          node scripts/test-visual-system.cjs

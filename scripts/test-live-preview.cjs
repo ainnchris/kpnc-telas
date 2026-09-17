@@ -67,10 +67,14 @@ async function openPreview(page, mode, name, key = '') {
   try {
     const hostContext = await context(browser);
     const guestContext = await context(browser);
+    const wrongKeyContext = await context(browser);
+    const modeContext = await context(browser);
     host = await hostContext.newPage();
     const guest = await guestContext.newPage();
+    const wrongKeyGuest = await wrongKeyContext.newPage();
+    const modeGuest = await modeContext.newPage();
     const pageErrors = [];
-    for (const page of [host, guest]) {
+    for (const page of [host, guest, wrongKeyGuest, modeGuest]) {
       page.on('pageerror', error => pageErrors.push(error.message));
       page.on('dialog', dialog => dialog.accept());
     }
@@ -124,8 +128,35 @@ async function openPreview(page, mode, name, key = '') {
     assert(reconnect.events.includes('reconnected'), 'LiveKit must confirm the restored connection');
     await guest.waitForFunction(() => /^E2EE.*Conexão|^E2EE.*Conectado/i.test(document.querySelector('#connection')?.textContent || ''), null, { timeout: 45_000 });
 
+    await modeGuest.goto(invite, { waitUntil: 'domcontentloaded' });
+    await modeGuest.locator('#join-meeting').click();
+    await modeGuest.locator('#preview').waitFor({ state: 'visible' });
+    await modeGuest.locator('#display-name').fill('Modo incompatível');
+    await modeGuest.locator('#enter-room').click();
+    await modeGuest.waitForFunction(() => /exige criptografia ponta a ponta/i.test(document.querySelector('#preview-error')?.textContent || ''), null, { timeout: 15_000 });
+    assert(await modeGuest.locator('#waiting').isHidden());
+
+    await wrongKeyGuest.goto(invite, { waitUntil: 'domcontentloaded' });
+    await captureRoom(wrongKeyGuest);
+    const wrongKey = key === 'A'.repeat(32) ? 'B'.repeat(32) : 'A'.repeat(32);
+    await openPreview(wrongKeyGuest, 'join', 'Chave incorreta', wrongKey);
+    await wrongKeyGuest.locator('#preview-mic').click();
+    await wrongKeyGuest.locator('#preview-camera').click();
+    await wrongKeyGuest.locator('#enter-room').click();
+    await wrongKeyGuest.locator('#waiting').waitFor({ state: 'visible' });
+    const wrongKeyAdmit = host.locator('#admission-list .admit').first();
+    await wrongKeyAdmit.waitFor({ state: 'visible', timeout: 20_000 });
+    await wrongKeyAdmit.click();
+    await wrongKeyGuest.waitForFunction(() => {
+      const home = document.querySelector('#home');
+      const toast = document.querySelector('#toast');
+      return home && !home.classList.contains('hidden') && /chave da reunião/i.test(toast?.textContent || '');
+    }, null, { timeout: 45_000 });
+    await host.locator('#meeting').waitFor({ state: 'visible' });
+    await guest.locator('#meeting').waitFor({ state: 'visible' });
+
     assert.deepEqual(pageErrors, []);
-    console.log(`PASS: chamada E2EE real, convite isolado, dois participantes, mídia e reconexão (${room})`);
+    console.log(`PASS: chamada E2EE real, convite isolado, mídia, reconexão e bloqueios de modo/chave incorretos (${room})`);
   } finally {
     if (host && await host.locator('#end-for-all').isVisible().catch(() => false)) {
       await host.locator('#end-for-all').click().catch(() => {});

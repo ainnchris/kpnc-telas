@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080c14">
+<title>Kpnc Meet — Reuniões simples, do seu jeito</title>
+<meta name="description" content="Videoconferências rápidas e seguras direto do navegador, com transmissão de tela em alta qualidade.">
+<link rel="icon" type="image/png" sizes="128x128" href="/img/favicon.png">
+<link rel="apple-touch-icon" href="/img/favicon.png">
+<link rel="preload" as="font" type="font/woff2" href="/fonts/plus-jakarta-sans-latin-wght-normal.woff2" crossorigin>
+<script src="/js/theme-init.js"></script>
+<link rel="stylesheet" href="/css/kpnc.css">
+</head>
+<body>
+<svg class="svg-sprite" aria-hidden="true">
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></symbol>
+<symbol id="i-pip" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><rect x="12" y="11" width="6.5" height="5" rx="1.2"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 7.2A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.4-1"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></symbol>
+<symbol id="i-window" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9h16"/></symbol>
+<symbol id="i-browser" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9h18M6.5 7h.01M9.5 7h.01"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+<symbol id="i-live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/></symbol>
+</svg>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<header class="topbar">
+  <a class="logo" href="/" aria-label="Kpnc Meet"><img src="/img/favicon.png" alt="" width="36" height="36"><strong>Kpnc <b>Meet</b></strong></a>
+  <div class="top-actions">
+    <button id="profile-open" class="profile-button" title="Editar perfil" aria-label="Editar perfil"><span id="header-avatar" class="mini-avatar">K</span></button>
+  </div>
+</header>
+
+<!-- HOME -->
+<main id="home" class="home">
+  <section class="hero">
+    <p class="eyebrow"><span class="dot"></span>CONVERSAS QUE APROXIMAM</p>
+    <h1>Reuniões simples.<br><em>Conexões reais.</em></h1>
+    <p class="lead">Vídeo, voz e transmissão de tela em um só lugar. Crie uma conversa ou entre com um código — sem instalar nada.</p>
+    <div class="join-row">
+      <button id="new-meeting" class="primary"><svg><use href="#i-plus"/></svg>Nova reunião</button>
+      <label class="code-box"><svg><use href="#i-keyboard"/></svg><input id="room-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Digite um código ou link"></label>
+      <button id="join-meeting" class="text-button" disabled>Participar</button>
+    </div>
+    <p id="home-error" class="error"></p>
+    <div class="trust">
+      <span><svg><use href="#i-check"/></svg>Sem cadastro</span>
+      <span><svg><use href="#i-check"/></svg>Criptografia em trânsito</span>
+      <span><svg><use href="#i-check"/></svg>Funciona no navegador</span>
+    </div>
+  </section>
+
+  <div class="hero-art" aria-hidden="true">
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span class="mock-code">kpnc-meet</span><b class="mock-live"><em></em>AO VIVO</b></div>
+      <div class="mock-body">
+        <div class="mock-screen">
+          <div class="mock-lines"><s style="width:42%"></s><s style="width:68%"></s><s style="width:55%"></s><s style="width:30%"></s><s style="width:74%"></s><s style="width:48%"></s></div>
+          <div class="mock-chip"><svg><use href="#i-screen"/></svg>Ana está transmitindo · 1080p 60 fps</div>
+        </div>
+        <div class="mock-strip">
+          <div class="mock-face f1"><span>AN</span></div>
+          <div class="mock-face f2"><span>LU</span></div>
+          <div class="mock-face f3"><span>VC</span></div>
+        </div>
+      </div>
+      <div class="mock-dock"><span><svg><use href="#i-mic"/></svg></span><span><svg><use href="#i-video"/></svg></span><span class="on"><svg><use href="#i-screen"/></svg></span><span><svg><use href="#i-hand"/></svg></span><span class="end"><svg><use href="#i-leave"/></svg></span></div>
+    </div>
+  </div>
+
+  <section class="features" aria-label="Recursos">
+    <article><span class="ficon"><svg><use href="#i-live"/></svg></span><h3>Transmissão de tela</h3><p>Escolha resolução, fluidez e áudio antes de começar. Quem assiste ajusta o volume e abre em tela cheia.</p></article>
+    <article><span class="ficon"><svg><use href="#i-shield"/></svg></span><h3>Sala de espera</h3><p>O anfitrião aprova ou recusa cada pessoa que pede para entrar.</p></article>
+    <article><span class="ficon"><svg><use href="#i-chat"/></svg></span><h3>Chat e reações</h3><p>Mensagens, emojis e mão levantada, sem guardar nada no servidor.</p></article>
+    <article><span class="ficon"><svg><use href="#i-people"/></svg></span><h3>Seu perfil</h3><p>Nome, foto ou GIF pequeno e avatares próprios, salvos só no seu dispositivo.</p></article>
+  </section>
+</main>
+
+<!-- PRÉ-ENTRADA -->
+<main id="preview" class="preview hidden">
+  <section class="preview-media">
+    <video id="preview-video" autoplay muted playsinline></video>
+    <div id="preview-avatar" class="preview-avatar">K</div>
+    <div class="preview-status">Tudo pronto?</div>
+    <div class="preview-controls">
+      <button id="preview-mic" class="round" title="Microfone"><svg><use href="#i-mic"/></svg></button>
+      <button id="preview-camera" class="round" title="Câmera"><svg><use href="#i-video"/></svg></button>
+    </div>
+  </section>
+  <section class="preview-form">
+    <button id="preview-back" class="back"><svg><use href="#i-back"/></svg>Voltar</button>
+    <p class="eyebrow"><span class="dot"></span>PRÉ-ENTRADA</p>
+    <h2>Como você quer aparecer?</h2>
+    <label>Seu nome<input id="display-name" maxlength="48" placeholder="Digite seu nome" autocomplete="name"></label>
+    <p id="preview-room-label" class="room-label"></p>
+    <button id="enter-room" class="primary wide">Participar agora</button>
+    <p id="preview-error" class="error"></p>
+    <small>Confira sua câmera e seu microfone antes de entrar.</small>
+  </section>
+</main>
+
+<!-- SALA DE ESPERA -->
+<main id="waiting" class="waiting hidden">
+  <section>
+    <div class="waiting-icon"><svg><use href="#i-people"/></svg></div>
+    <p class="eyebrow"><span class="dot"></span>SALA DE ESPERA</p>
+    <h2>Pedimos para você aguardar</h2>
+    <p id="waiting-message">O anfitrião recebeu sua solicitação para entrar.</p>
+    <button id="cancel-request" class="back"><svg><use href="#i-back"/></svg>Cancelar e voltar</button>
+  </section>
+</main>
+
+<!-- REUNIÃO -->
+<main id="meeting" class="meeting hidden">
+  <header class="meeting-head">
+    <div class="meeting-id"><strong>Kpnc Meet</strong><span id="meeting-code" class="code-chip"></span></div>
+    <div class="head-right">
+      <div id="connection" class="connection">Conectando…</div>
+      <div class="actions">
+        <button id="copy-link" title="Copiar convite"><svg><use href="#i-link"/></svg></button>
+        <button id="participants-toggle" title="Participantes"><svg><use href="#i-people"/></svg><span id="participant-count">1</span></button>
+        <button id="chat-toggle" title="Mensagens"><svg><use href="#i-chat"/></svg></button>
+        <button id="fullscreen" title="Tela cheia"><svg><use href="#i-fullscreen"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <button id="enable-audio" class="primary hidden audio-unlock">Ouvir áudio da reunião</button>
+
+  <div id="share-banner" class="share-banner hidden" role="status">
+    <span class="live-dot"></span>
+    <div><strong>Você está transmitindo sua tela</strong><small id="share-banner-info"></small></div>
+    <button id="share-change" type="button">Alterar</button>
+    <button id="share-stop" type="button" class="stop"><svg><use href="#i-stop"/></svg>Parar</button>
+  </div>
+
+  <section id="grid" class="grid"></section>
+  <div id="captions-box" class="captions-box hidden"></div>
+
+  <footer class="meeting-footer">
+    <div class="controls">
+      <button id="mic" class="control" title="Microfone"><svg><use href="#i-mic"/></svg></button>
+      <button id="camera" class="control" title="Câmera"><svg><use href="#i-video"/></svg></button>
+      <button id="screen" class="control" title="Transmitir tela"><svg><use href="#i-screen"/></svg></button>
+      <button id="hand" class="control" title="Levantar a mão"><svg><use href="#i-hand"/></svg></button>
+      <button id="more-toggle" class="control" title="Mais opções"><svg><use href="#i-more"/></svg></button>
+      <button id="leave" class="control danger" title="Sair"><svg><use href="#i-leave"/></svg></button>
+    </div>
+  </footer>
+
+  <aside id="panel" class="panel">
+    <header>
+      <div class="panel-tabs">
+        <button data-panel="people" class="active"><svg><use href="#i-people"/></svg>Pessoas</button>
+        <button data-panel="chat"><svg><use href="#i-chat"/></svg>Mensagens<span id="chat-unread" class="unread hidden"></span></button>
+      </div>
+      <button id="close-panel" aria-label="Fechar painel"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <section id="people-panel">
+      <div id="waiting-host" class="hidden"><p class="panel-caption">AGUARDANDO PARA ENTRAR</p><div id="waiting-list"></div></div>
+      <p class="panel-caption">NA REUNIÃO</p>
+      <div id="people-list"></div>
+      <button id="end-for-all" class="end-all hidden"><svg><use href="#i-leave"/></svg>Encerrar para todos</button>
+    </section>
+    <section id="chat-panel" class="hidden">
+      <div id="messages" class="messages"></div>
+      <form id="chat-form"><input id="chat-input" maxlength="500" placeholder="Envie uma mensagem" autocomplete="off"><button title="Enviar"><svg><use href="#i-send"/></svg></button></form>
+    </section>
+  </aside>
+
+  <aside id="more-menu" class="more-menu">
+    <button id="captions"><svg><use href="#i-captions"/></svg>Legendas locais</button>
+    <button id="record"><svg><use href="#i-record"/></svg>Gravar neste dispositivo</button>
+    <button id="blur"><svg><use href="#i-blur"/></svg>Desfocar fundo</button>
+    <button id="devices"><svg><use href="#i-settings"/></svg>Áudio e vídeo</button>
+  </aside>
+
+  <aside id="join-alert" class="join-alert hidden" aria-live="polite"></aside>
+</main>
+
+<!-- DIÁLOGOS -->
+<dialog id="profile-dialog"><form method="dialog" class="dialog-card"></form></dialog>
+
+<dialog id="devices-dialog">
+  <form method="dialog" class="dialog-card">
+    <header><h2>Áudio e vídeo</h2><button value="cancel" aria-label="Fechar"><svg><use href="#i-close"/></svg></button></header>
+    <p id="device-status" role="status">O dispositivo padrão do sistema é selecionado automaticamente.</p>
+    <button type="button" id="identify-devices">Identificar nomes dos dispositivos</button>
+    <label>Microfone<select id="audio-input"></select></label>
+    <label>Câmera<select id="video-input"></select></label>
+    <label>Saída de áudio<select id="audio-output"></select></label>
+    <button id="test-speaker" type="button">Testar saída de áudio</button>
+    <button value="ok" class="primary">Concluir</button>
+  </form>
+</dialog>
+
+<dialog id="share-dialog">
+  <form method="dialog" class="dialog-card share-card" id="share-form">
+    <header>
+      <div><h2>Transmitir tela</h2><p class="sub">Escolha a qualidade antes de começar. O navegador vai pedir para você selecionar o que mostrar.</p></div>
+      <button value="cancel" aria-label="Fechar"><svg><use href="#i-close"/></svg></button>
+    </header>
+
+    <div class="presets" role="group" aria-label="Predefinições">
+      <button type="button" data-preset="text"><strong>Texto e slides</strong><small>1080p · 15 fps · nitidez</small></button>
+      <button type="button" data-preset="balanced"><strong>Equilibrado</strong><small>1080p · 30 fps</small></button>
+      <button type="button" data-preset="motion"><strong>Jogos e vídeo</strong><small>1080p · 60 fps · fluidez</small></button>
+    </div>
+
+    <fieldset>
+      <legend>Começar escolhendo</legend>
+      <div class="seg" data-key="surface">
+        <button type="button" data-value="monitor"><svg><use href="#i-monitor"/></svg>Tela inteira</button>
+        <button type="button" data-value="window"><svg><use href="#i-window"/></svg>Janela</button>
+        <button type="button" data-value="browser"><svg><use href="#i-browser"/></svg>Guia</button>
+      </div>
+    </fieldset>
+
+    <div class="two">
+      <fieldset>
+        <legend>Resolução</legend>
+        <div class="seg" data-key="res">
+          <button type="button" data-value="720">720p</button>
+          <button type="button" data-value="1080">1080p</button>
+          <button type="button" data-value="1440">1440p</button>
+          <button type="button" data-value="0">Fonte</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Quadros por segundo</legend>
+        <div class="seg" data-key="fps">
+          <button type="button" data-value="15">15</button>
+          <button type="button" data-value="30">30</button>
+          <button type="button" data-value="60">60</button>
+        </div>
+      </fieldset>
+    </div>
+
+    <fieldset>
+      <legend>Otimizar para</legend>
+      <div class="seg" data-key="hint">
+        <button type="button" data-value="detail">Nitidez (texto, slides)</button>
+        <button type="button" data-value="motion">Fluidez (jogos, vídeo)</button>
+      </div>
+    </fieldset>
+
+    <label class="switch"><input type="checkbox" id="share-audio"><span class="track"><i></i></span><span class="switch-text"><strong>Compartilhar áudio</strong><small>Funciona ao escolher tela inteira ou uma guia no Chrome e no Edge.</small></span></label>
+
+    <p class="hint"><svg><use href="#i-info"/></svg><span id="share-estimate"></span></p>
+
+    <aside id="border-tip" class="tip hidden">
+      <svg><use href="#i-info"/></svg>
+      <div>
+        <strong>Apareceu uma borda amarela em volta da tela?</strong>
+        <p>É o aviso que o próprio Windows 11 desenha durante capturas; o site não consegue removê-la. Em <em>Configurações → Privacidade e segurança → Screenshot borders</em>, ative <em>Let desktop apps turn off the screenshot border</em> e reabra o navegador. Compartilhar uma guia do navegador em vez da tela inteira também costuma evitá-la.</p>
+      </div>
+    </aside>
+
+    <footer class="dialog-actions">
+      <button value="cancel" type="submit" class="ghost">Cancelar</button>
+      <button id="share-start" type="button" class="primary"><svg><use href="#i-live"/></svg>Começar transmissão</button>
+    </footer>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.1/dist/livekit-client.umd.js" integrity="sha384-wXuXmfs9PZcw5p/7czRbZjBY7FpAcMXY4bPUoM28FnAyNLpJdvTqG2Iv+s0c3UcA" crossorigin="anonymous"></script>
+<script src="/js/icons.js"></script>
+<script src="/js/sounds.js"></script>
+<script src="/js/avatar-presets.js"></script>
+<script src="/js/profile.js"></script>
+<script src="/js/themes.js"></script>
+<script src="/js/responsive.js"></script>
+<script src="/js/meet-ui.js"></script>
+<script src="/js/media-start.js"></script>
+<script src="/js/share.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/updates.js"></script>
+</body>
+</html>

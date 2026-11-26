@@ -1,0 +1,1 @@
+(()=>{try{const t=localStorage.getItem('kpnc-theme');document.documentElement.dataset.theme=['light','dark','gray','black'].includes(t)?t:'dark'}catch{document.documentElement.dataset.theme='dark'}})();

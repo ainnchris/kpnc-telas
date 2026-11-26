@@ -1,0 +1,19 @@
+{
+  "name": "kpnc-telas",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Kpnc Telas — videoconferencias com Cloudflare Pages e LiveKit.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "check": "tsc --noEmit -p worker/tsconfig.json && wrangler deploy --dry-run --config worker/wrangler.jsonc",
+    "worker:dev": "wrangler dev --config worker/wrangler.jsonc",
+    "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc --keep-vars",
+    "worker:types": "wrangler types --config worker/wrangler.jsonc worker/worker-configuration.d.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260827.1",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.127.0"
+  }
+}
+

@@ -5,21 +5,20 @@
   // continua responsável por mostrar o seletor de tela/janela/guia.
   const $ = s => document.querySelector(s);
   const STORE = 'kpnc-share';
-  const SIZES = { '720': [1280, 720], '1080': [1920, 1080], '1440': [2560, 1440], '0': [3840, 2160] };
-  const LABEL = { '720': '720p', '1080': '1080p', '1440': '1440p', '0': 'Fonte' };
+  const SIZES = { '720': [1280, 720], '1080': [1920, 1080], '1440': [2560, 1440] };
+  const LABEL = { '720': '720p', '1080': '1080p', '1440': '1440p' };
   // Taxas máximas de envio (bits/s) por resolução e quadros por segundo.
   const BITRATE = {
     '720': { 15: 1.5e6, 30: 2.5e6, 60: 4e6 },
     '1080': { 15: 3e6, 30: 5e6, 60: 8e6 },
-    '1440': { 15: 5e6, 30: 8e6, 60: 12e6 },
-    '0': { 15: 6e6, 30: 10e6, 60: 15e6 }
+    '1440': { 15: 5e6, 30: 8e6, 60: 12e6 }
   };
   const PRESETS = {
     text: { res: '1080', fps: 15, hint: 'detail' },
-    balanced: { res: '1080', fps: 30, hint: 'detail' },
-    motion: { res: '1080', fps: 60, hint: 'motion' }
+    balanced: { res: '720', fps: 30, hint: 'detail' },
+    motion: { res: '720', fps: 60, hint: 'motion' }
   };
-  const DEFAULTS = { surface: 'monitor', res: '1080', fps: 30, hint: 'detail', audio: true };
+  const DEFAULTS = { surface: 'monitor', res: '720', fps: 30, hint: 'detail', audio: true };
   const ALLOWED = { surface: ['monitor', 'window', 'browser'], res: Object.keys(SIZES), fps: [15, 30, 60], hint: ['detail', 'motion'] };
 
   let ctx = { room: () => null, toast: () => {}, changed: () => {} };
